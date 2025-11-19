@@ -12,6 +12,8 @@ export const $formManagerForm = Signal({
   is_published: false,
   show_title: true,
   show_description: true,
+  show_discount_code: true,
+  show_tickets_remaining: true,
   theme: 'light',
   order_confirmation_url: '',
 });
@@ -28,8 +30,10 @@ export const $currentFormField = Signal({
   type: 'text',
   label: '',
   placeholder: '',
+  instructions: '',
   required: false,
   options: [],
+  optionsString: '',
 });
 
 export const loadForms = async (eventId) => {
@@ -56,6 +60,8 @@ export const handleOpenModal = (form = null) => {
       is_published: form.is_published || false,
       show_title: form.show_title !== undefined ? form.show_title : true,
       show_description: form.show_description !== undefined ? form.show_description : true,
+      show_discount_code: form.show_discount_code !== undefined ? form.show_discount_code : true,
+      show_tickets_remaining: form.show_tickets_remaining !== undefined ? form.show_tickets_remaining : true,
       theme: form.theme || 'light',
       order_confirmation_url: form.order_confirmation_url || '',
     });
@@ -118,13 +124,6 @@ export const handleFieldChange = (e) => {
   };
 };
 
-export const handleOptionsChange = (value) => {
-  const options = value.split('\n').filter((opt) => opt.trim());
-  $currentFormField.value = {
-    ...$currentFormField.value,
-    options,
-  };
-};
 
 export const handleAddField = () => {
   const currentField = $currentFormField.value;
@@ -134,10 +133,20 @@ export const handleAddField = () => {
     return;
   }
 
+  // Convert optionsString to options array
+  const fieldToAdd = { ...currentField };
+  if (currentField.optionsString) {
+    fieldToAdd.options = currentField.optionsString
+      .split(',')
+      .map((opt) => opt.trim())
+      .filter((opt) => opt);
+  }
+  delete fieldToAdd.optionsString;
+
   const currentSchema = $formManagerForm.value.schema;
   $formManagerForm.value = {
     ...$formManagerForm.value,
-    schema: [...currentSchema, currentField],
+    schema: [...currentSchema, fieldToAdd],
   };
 
   $currentFormField.reset();
@@ -145,7 +154,15 @@ export const handleAddField = () => {
 
 export const handleEditField = (index) => {
   const fields = $formManagerForm.value.schema;
-  $currentFormField.value = fields[index];
+  const field = fields[index];
+  
+  // Convert options array back to string for editing
+  const fieldToEdit = { ...field };
+  if (field.options && Array.isArray(field.options)) {
+    fieldToEdit.optionsString = field.options.join(', ');
+  }
+  
+  $currentFormField.value = fieldToEdit;
 
   // Remove the field temporarily - will be re-added on "Add Field"
   const newSchema = fields.filter((_, i) => i !== index);
@@ -208,6 +225,8 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       is_published: formData.is_published,
       show_title: formData.show_title,
       show_description: formData.show_description,
+      show_discount_code: formData.show_discount_code,
+      show_tickets_remaining: formData.show_tickets_remaining,
       theme: formData.theme,
       order_confirmation_url: formData.order_confirmation_url || null,
     };

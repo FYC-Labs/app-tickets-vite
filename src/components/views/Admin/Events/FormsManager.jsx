@@ -17,7 +17,6 @@ import {
   handleOpenModal,
   handleCloseModal,
   handleTicketSelection,
-  handleOptionsChange,
   handleAddField,
   handleEditField,
   handleDeleteField,
@@ -239,6 +238,18 @@ function FormsManager({ eventId, tickets, onUpdate }) {
                     signal={$formManagerForm}
                     label="Show form instructions"
                   />
+                  <UniversalInput
+                    type="checkbox"
+                    name="show_discount_code"
+                    signal={$formManagerForm}
+                    label="Show discount code option"
+                  />
+                  <UniversalInput
+                    type="checkbox"
+                    name="show_tickets_remaining"
+                    signal={$formManagerForm}
+                    label="Show tickets remaining"
+                  />
                 </div>
 
                 <Form.Group className="mb-24">
@@ -334,17 +345,28 @@ function FormsManager({ eventId, tickets, onUpdate }) {
                       />
                     </Form.Group>
 
+                    <Form.Group className="mb-16">
+                      <Form.Label>Instructions</Form.Label>
+                      <UniversalInput
+                        as="textarea"
+                        rows={2}
+                        name="instructions"
+                        signal={$currentFormField}
+                        placeholder="Additional help text for this field..."
+                      />
+                      <Form.Text className="text-muted">
+                        Optional help text that will appear below the field
+                      </Form.Text>
+                    </Form.Group>
+
                     {needsOptions && (
                       <Form.Group className="mb-16">
-                        <Form.Label>Options (one per line)</Form.Label>
+                        <Form.Label>Options (comma separated)</Form.Label>
                         <UniversalInput
-                          as="textarea"
-                          rows={3}
-                          name="options"
+                          type="text"
+                          name="optionsString"
                           signal={$currentFormField}
-                          value={(currentField.options || []).join('\n')}
-                          customOnChange={(e) => handleOptionsChange(e.target.value)}
-                          placeholder="Option 1&#10;Option 2&#10;Option 3"
+                          placeholder="Option 1, Option 2, Option 3"
                         />
                       </Form.Group>
                     )}

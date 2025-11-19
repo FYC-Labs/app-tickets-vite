@@ -41,6 +41,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               customOnChange={(e) => handleFieldChange(field.label, e.target.value)}
               required={field.required}
             />
+            {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
           </Form.Group>
         );
 
@@ -64,6 +65,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                 </option>
               ))}
             </UniversalInput>
+            {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
           </Form.Group>
         );
 
@@ -78,6 +80,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               customOnChange={(e) => handleFieldChange(field.label, e.target.checked)}
               required={field.required}
             />
+            {field.instructions && <Form.Text className="text-muted d-block">{field.instructions}</Form.Text>}
           </Form.Group>
         );
 
@@ -99,6 +102,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                 required={field.required}
               />
             ))}
+            {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
           </Form.Group>
         );
 
@@ -116,6 +120,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               customOnChange={(e) => handleFieldChange(field.label, e.target.value)}
               required={field.required}
             />
+            {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
           </Form.Group>
         );
     }
@@ -176,7 +181,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                   <Card key={ticket.id} className="mb-24 border-0 shadow-none bg-transparent">
                     <Card.Body>
                       <Row className="align-items-center">
-                        <Col md={6}>
+                        <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
                           <h6 className="mb-8">{ticket.name}</h6>
                           {ticket.description && (
                             <p className="text-muted small mb-0">{ticket.description}</p>
@@ -188,9 +193,11 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                             ${parseFloat(ticket.price).toFixed(2)}
                           </strong>
                         </Col>
-                        <Col md={3} className="text-muted small">
-                          {available > 0 ? `${available} available` : 'Sold out'}
-                        </Col>
+                        {form?.show_tickets_remaining !== false && (
+                          <Col md={3} className="text-muted small">
+                            {available > 0 ? `${available} available` : 'Sold out'}
+                          </Col>
+                        )}
                         <Col md={3}>
                           <Form.Label>Quantity</Form.Label>
                           <UniversalInput
@@ -211,32 +218,34 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                 );
               })}
 
-              <div className="mb-24">
-                <Form.Label>Discount Code</Form.Label>
-                <UniversalInput
-                  type="text"
-                  name="discountCode"
-                  placeholder="Enter code"
-                  value={discountCode}
-                  customOnChange={(e) => updateDiscountCode(e.target.value.toUpperCase())}
-                  className="flex-grow-1"
-                  style={{ minWidth: 0 }}
-                />
-                <div className="mt-8">
-                  <Button
-                    variant="dark"
-                    onClick={() => handleApplyDiscount(formId, eventId)}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    Apply
-                  </Button>
+              {form?.show_discount_code !== false && (
+                <div className="mb-24">
+                  <Form.Label>Discount Code</Form.Label>
+                  <UniversalInput
+                    type="text"
+                    name="discountCode"
+                    placeholder="Enter code"
+                    value={discountCode}
+                    customOnChange={(e) => updateDiscountCode(e.target.value.toUpperCase())}
+                    className="flex-grow-1"
+                    style={{ minWidth: 0 }}
+                  />
+                  <div className="mt-8">
+                    <Button
+                      variant="dark"
+                      onClick={() => handleApplyDiscount(formId, eventId)}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {appliedDiscount && (
+                    <small className="text-success">
+                      Discount applied: {appliedDiscount.code}
+                    </small>
+                  )}
                 </div>
-                {appliedDiscount && (
-                  <small className="text-success">
-                    Discount applied: {appliedDiscount.code}
-                  </small>
-                )}
-              </div>
+              )}
 
               {totals.subtotal > 0 && (
                 <Card className="bg-transparent">

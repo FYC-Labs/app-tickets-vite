@@ -154,7 +154,9 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
         customerio_app_api_key,
         customerio_transactional_template_id,
         customerio_site_id,
-        customerio_track_api_key
+        customerio_track_api_key,
+        customerio_custom_attribute_key,
+        customerio_custom_attribute_value
       )
     `)
     .eq("id", orderId)
@@ -264,10 +266,37 @@ function buildCustomerAttributes(
     // Order items
     order_items: orderItemsArr,
     total_tickets: orderItemsArr.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
-    
-    // Special flag
-    ftw2026: true,
   };
+
+  // Add custom attribute if configured
+  const customKey = event.customerio_custom_attribute_key;
+  const customValue = event.customerio_custom_attribute_value;
+
+  if (
+    customKey &&
+    customValue !== null &&
+    customValue !== undefined &&
+    customValue !== ""
+  ) {
+    // Parse value as boolean if it's "true" or "false", otherwise keep as string
+    let parsedValue: any = customValue;
+    const valueStr = String(customValue).toLowerCase().trim();
+    if (valueStr === "true") {
+      parsedValue = true;
+    } else if (valueStr === "false") {
+      parsedValue = false;
+    } else if (
+      !isNaN(Number(customValue)) &&
+      String(customValue).trim() !== ""
+    ) {
+      // Try to parse as number if it's numeric
+      parsedValue = Number(customValue);
+    }
+
+    attributes[customKey] = parsedValue;
+  }
+
+  return attributes;
 }
 
 /**

@@ -253,6 +253,46 @@ function EventDetail() {
 
                     <hr className="my-32" />
 
+                    <h6 className="mb-24">Custom Attributes (Optional)</h6>
+                    <p className="text-muted mb-24">
+                      Configure custom attributes to be sent to Customer.io when identifying customers. This allows you to tag customers with event-specific attributes (e.g., "ftw2026: true", "event_tag: DVLPR2026"). Leave empty to skip custom attributes.
+                    </p>
+
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-24">
+                          <Form.Label>Custom Attribute Key</Form.Label>
+                          <Form.Control
+                            type="text"
+                            name="customerio_custom_attribute_key"
+                            value={formData.customerio_custom_attribute_key}
+                            onChange={handleChange}
+                            placeholder="e.g., ftw2026, event_tag"
+                          />
+                          <Form.Text className="text-muted">
+                            The attribute key to send to Customer.io (e.g., "ftw2026", "event_tag")
+                          </Form.Text>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-24">
+                          <Form.Label>Custom Attribute Value</Form.Label>
+                          <Form.Control
+                            type="text"
+                            name="customerio_custom_attribute_value"
+                            value={formData.customerio_custom_attribute_value}
+                            onChange={handleChange}
+                            placeholder="e.g., true, DVLPR2026, 123"
+                          />
+                          <Form.Text className="text-muted">
+                            The attribute value to send to Customer.io (e.g., "true", "developer2026", "123"). Will be parsed as boolean or number if applicable.
+                          </Form.Text>
+                        </Form.Group>
+                      </Col>
+                    </Row>
+
+                    <hr className="my-32" />
+
                     <h5 className="mb-24">AccruPay Configuration</h5>
                     <p className="text-muted mb-24">
                       Configure which AccruPay environment to use for payment processing for this event.

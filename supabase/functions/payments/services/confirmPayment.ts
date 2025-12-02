@@ -228,13 +228,13 @@ function buildCustomerAttributes(
   
   // Build order items array with details
   const orderItemsArr = (orderItems || []).map((item: any) => ({
-    ticketTypeName: item.ticket_type_name || "",
+    ticketTypeName: item.ticket_type_name || item.ticket_types?.name || "",
     quantity: item.quantity,
     unitPrice: item.unit_price,
     subtotal: item.subtotal
   }));
 
-  return {
+  const attributes: any = {
     // Customer details
     name: eventData.customer_name || "",
     first_name: eventData.customer_first_name || "",

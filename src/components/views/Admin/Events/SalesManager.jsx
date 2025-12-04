@@ -35,6 +35,15 @@ function SalesManager({ eventId }) {
     return variants[status] || 'secondary';
   };
 
+  const getPaymentEnvironmentBadge = (env) => {
+    if (!env) return null;
+    const variants = {
+      production: 'success',
+      sandbox: 'warning',
+    };
+    return variants[env] || 'secondary';
+  };
+
   const getStatusExplanation = (status) => {
     const explanations = {
       PENDING: 'This order has not been paid yet. Deleting it will remove the pending order and any associated tickets will not be reserved.',
@@ -162,6 +171,7 @@ function SalesManager({ eventId }) {
                 <th>Total</th>
                 <th>Discount</th>
                 <th>Status</th>
+                <th>Environment</th>
                 <th>Date</th>
                 <th>Actions</th>
               </tr>
@@ -211,6 +221,15 @@ function SalesManager({ eventId }) {
                     <Badge bg={getStatusBadge(order.status)}>
                       {order.status}
                     </Badge>
+                  </td>
+                  <td>
+                    {order.payment_environment ? (
+                      <Badge bg={getPaymentEnvironmentBadge(order.payment_environment)}>
+                        {order.payment_environment === 'production' ? 'Prod' : 'Sandbox'}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted small">-</span>
+                    )}
                   </td>
                   <td className="small">
                     {format(new Date(order.created_at), 'MMM d, yyyy')}

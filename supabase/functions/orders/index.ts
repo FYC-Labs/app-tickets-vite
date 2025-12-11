@@ -3,6 +3,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { syncOrderStatusToCustomerIO } from "./services/syncOrderStatusToCustomerIO.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +55,7 @@ Deno.serve(async (req: Request) => {
             payment_intent_id,
             payment_session_id,
             payment_provider,
+            payment_environment,
             customer_email,
             customer_name,
             customer_first_name,
@@ -111,6 +113,7 @@ Deno.serve(async (req: Request) => {
             payment_intent_id,
             payment_session_id,
             payment_provider,
+            payment_environment,
             customer_email,
             customer_name,
             customer_first_name,
@@ -166,6 +169,38 @@ Deno.serve(async (req: Request) => {
         const orderData = data;
         const { items, ...order } = orderData;
 
+        // Determine payment environment from event or ENV_TAG
+        let paymentEnvironment: string | null = null;
+        if (order.event_id) {
+          const { data: event, error: eventError } = await supabaseClient
+            .from("events")
+            .select("accrupay_environment")
+            .eq("id", order.event_id)
+            .maybeSingle();
+
+          if (!eventError && event) {
+            // If event has explicit environment setting, use that
+            if (event.accrupay_environment === "production" || event.accrupay_environment === "sandbox") {
+              paymentEnvironment = event.accrupay_environment;
+            } else {
+              // Otherwise, use global ENV_TAG
+              const envTag = Deno.env.get("ENV_TAG") ?? "dev";
+              paymentEnvironment = envTag === "prod" ? "production" : "sandbox";
+            }
+          } else {
+            // Fallback to ENV_TAG if event lookup fails
+            const envTag = Deno.env.get("ENV_TAG") ?? "dev";
+            paymentEnvironment = envTag === "prod" ? "production" : "sandbox";
+          }
+        } else {
+          // Fallback to ENV_TAG if no event_id
+          const envTag = Deno.env.get("ENV_TAG") ?? "dev";
+          paymentEnvironment = envTag === "prod" ? "production" : "sandbox";
+        }
+
+        // Add payment_environment to order data
+        order.payment_environment = paymentEnvironment;
+
         const { data: newOrder, error: orderError } = await supabaseClient
           .from("orders")
           .insert(order)
@@ -197,6 +232,20 @@ Deno.serve(async (req: Request) => {
           )
           .eq("id", newOrder.id)
           .maybeSingle();
+
+        // Sync order status to Customer.io (for PENDING orders)
+        // This allows Customer.io to identify customers with incomplete purchases
+        if (createdOrder) {
+          syncOrderStatusToCustomerIO(createdOrder.id, supabaseClient).catch(
+            (error) => {
+              // Log but don't fail the order creation
+              console.warn(
+                "Failed to sync order status to Customer.io on create:",
+                error
+              );
+            }
+          );
+        }
 
         result = { data: createdOrder };
         break;
@@ -235,6 +284,21 @@ Deno.serve(async (req: Request) => {
               });
             }
           }
+        }
+
+        // Sync order status to Customer.io whenever status changes
+        // This ensures Customer.io always has the latest order status
+        // (e.g., PENDING -> PAID, PENDING -> CANCELLED, etc.)
+        if (order) {
+          syncOrderStatusToCustomerIO(order.id, supabaseClient).catch(
+            (error) => {
+              // Log but don't fail the status update
+              console.warn(
+                "Failed to sync order status to Customer.io on update:",
+                error
+              );
+            }
+          );
         }
 
         result = { data: order };

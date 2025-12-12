@@ -1,18 +1,38 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, Tab, Tabs, Form } from 'react-bootstrap';
+import {
+  faArrowLeft,
+  faCheck,
+  faCopy,
+  faSave,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faSave, faCopy, faCheck } from '@fortawesome/free-solid-svg-icons';
-import { useState } from 'react';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
-import { $events, $tickets } from '@src/signals';
-import Loader from '@src/components/global/Loader';
 import GooglePlacesAutocomplete from '@src/components/global/Inputs/GooglePlacesAutocomplete';
-import TicketsManager from './TicketsManager';
+import Loader from '@src/components/global/Loader';
+import { $events, $tickets } from '@src/signals';
+import { useState } from 'react';
+import {
+  Badge,
+  Button,
+  Card,
+  Col,
+  Container,
+  Form,
+  Row,
+  Tab,
+  Tabs,
+} from 'react-bootstrap';
+import { useNavigate, useParams } from 'react-router-dom';
 import DiscountsManager from './DiscountsManager';
 import FormsManager from './FormsManager';
 import SalesManager from './SalesManager';
-import { loadEventData, getStatusBadge } from './_helpers/eventDetail.events';
-import { $eventForm, loadEvent, handleChange, handleSubmit } from './_helpers/eventForm.events';
+import TicketsManager from './TicketsManager';
+import { getStatusBadge, loadEventData } from './_helpers/eventDetail.events';
+import {
+  $eventForm,
+  handleChange,
+  handleSubmit,
+  loadEvent,
+} from './_helpers/eventForm.events';
 
 function EventDetail() {
   const { id } = useParams();
@@ -32,7 +52,7 @@ function EventDetail() {
 
   const handleEventSubmit = async (e) => {
     e.preventDefault();
-    await handleSubmit(e, id, () => { });
+    await handleSubmit(e, id, () => {});
     await loadEventData(id);
   };
 
@@ -161,7 +181,11 @@ function EventDetail() {
                       </Form.Text>
                     </Form.Group>
 
-                    <Button type="submit" variant="primary" disabled={formLoading}>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      disabled={formLoading}
+                    >
                       <FontAwesomeIcon icon={faSave} className="me-2" />
                       {formLoading ? 'Saving...' : 'Save Changes'}
                     </Button>
@@ -171,11 +195,19 @@ function EventDetail() {
             </Tab>
 
             <Tab eventKey="tickets" title="Tickets">
-              <TicketsManager eventId={id} tickets={tickets} onUpdate={() => loadEventData(id)} />
+              <TicketsManager
+                eventId={id}
+                tickets={tickets}
+                onUpdate={() => loadEventData(id)}
+              />
             </Tab>
 
             <Tab eventKey="forms" title="Forms">
-              <FormsManager eventId={id} tickets={tickets} onUpdate={() => loadEventData(id)} />
+              <FormsManager
+                eventId={id}
+                tickets={tickets}
+                onUpdate={() => loadEventData(id)}
+              />
             </Tab>
 
             <Tab eventKey="discounts" title="Discount Codes">
@@ -191,8 +223,9 @@ function EventDetail() {
                 <Card.Body>
                   <h5 className="mb-24">Customer.io Configuration</h5>
                   <p className="text-muted mb-24">
-                    Configure Customer.io credentials to enable transactional email notifications
-                    for ticket purchases. These emails will be sent automatically after successful payment.
+                    Configure Customer.io credentials to enable transactional
+                    email notifications for ticket purchases. These emails will
+                    be sent automatically after successful payment.
                   </p>
                   <Form onSubmit={handleEventSubmit}>
                     <Form.Group className="mb-24">
@@ -205,7 +238,9 @@ function EventDetail() {
                         placeholder="Enter your Customer.io App API Key"
                       />
                       <Form.Text className="text-muted">
-                        Your Customer.io App API Key (not Track API Key). Find this in Workspace Settings → API Credentials → App API Keys. Keep this secure.
+                        Your Customer.io App API Key (not Track API Key). Find
+                        this in Workspace Settings → API Credentials → App API
+                        Keys. Keep this secure.
                       </Form.Text>
                     </Form.Group>
 
@@ -219,7 +254,8 @@ function EventDetail() {
                         placeholder="Enter the transactional email template ID"
                       />
                       <Form.Text className="text-muted">
-                        The ID or name of your Customer.io transactional email template
+                        The ID or name of your Customer.io transactional email
+                        template
                       </Form.Text>
                     </Form.Group>
 
@@ -233,7 +269,9 @@ function EventDetail() {
                         placeholder="Enter your Customer.io Site ID"
                       />
                       <Form.Text className="text-muted">
-                        Your Customer.io Site ID for Track API. Find this in Workspace Settings → API Credentials → Tracking API Keys.
+                        Your Customer.io Site ID for Track API. Find this in
+                        Workspace Settings → API Credentials → Tracking API
+                        Keys.
                       </Form.Text>
                     </Form.Group>
 
@@ -247,7 +285,8 @@ function EventDetail() {
                         placeholder="Enter your Customer.io Track API Key"
                       />
                       <Form.Text className="text-muted">
-                        Your Customer.io Track API Key (used with Site ID for identifying customers). Keep this secure.
+                        Your Customer.io Track API Key (used with Site ID for
+                        identifying customers). Keep this secure.
                       </Form.Text>
                     </Form.Group>
 
@@ -255,7 +294,11 @@ function EventDetail() {
 
                     <h6 className="mb-24">Custom Attributes (Optional)</h6>
                     <p className="text-muted mb-24">
-                      Configure custom attributes to be sent to Customer.io when identifying customers. This allows you to tag customers with event-specific attributes (e.g., "ftw2026: true", "event_tag: DVLPR2026"). Leave empty to skip custom attributes.
+                      Configure custom attributes to be sent to Customer.io when
+                      identifying customers. This allows you to tag customers
+                      with event-specific attributes (e.g., "ftw2026: true",
+                      "event_tag: DVLPR2026"). Leave empty to skip custom
+                      attributes.
                     </p>
 
                     <Row>
@@ -270,7 +313,8 @@ function EventDetail() {
                             placeholder="e.g., ftw2026, event_tag"
                           />
                           <Form.Text className="text-muted">
-                            The attribute key to send to Customer.io (e.g., "ftw2026", "event_tag")
+                            The attribute key to send to Customer.io (e.g.,
+                            "ftw2026", "event_tag")
                           </Form.Text>
                         </Form.Group>
                       </Col>
@@ -285,7 +329,9 @@ function EventDetail() {
                             placeholder="e.g., true, DVLPR2026, 123"
                           />
                           <Form.Text className="text-muted">
-                            The attribute value to send to Customer.io (e.g., "true", "developer2026", "123"). Will be parsed as boolean or number if applicable.
+                            The attribute value to send to Customer.io (e.g.,
+                            "true", "developer2026", "123"). Will be parsed as
+                            boolean or number if applicable.
                           </Form.Text>
                         </Form.Group>
                       </Col>
@@ -293,9 +339,37 @@ function EventDetail() {
 
                     <hr className="my-32" />
 
+                    <h5 className="mb-24">Slack Notifications</h5>
+                    <p className="text-muted mb-24">
+                      Configure a Slack webhook URL to receive notifications
+                      when new orders are created for this event. Leave empty to
+                      disable Slack notifications.
+                    </p>
+
+                    <Form.Group className="mb-24">
+                      <Form.Label>Slack Webhook URL</Form.Label>
+                      <Form.Control
+                        type="url"
+                        name="slack_webhook_url"
+                        value={formData.slack_webhook_url || ''}
+                        onChange={handleChange}
+                        placeholder="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+                      />
+                      <Form.Text className="text-muted">
+                        Enter your Slack webhook URL. You can create one by
+                        going to your Slack workspace → Apps → Incoming Webhooks
+                        → Add New Webhook. When configured, you'll receive a
+                        notification in Slack whenever a new order is created
+                        for this event.
+                      </Form.Text>
+                    </Form.Group>
+
+                    <hr className="my-32" />
+
                     <h5 className="mb-24">AccruPay Configuration</h5>
                     <p className="text-muted mb-24">
-                      Configure which AccruPay environment to use for payment processing for this event.
+                      Configure which AccruPay environment to use for payment
+                      processing for this event.
                     </p>
 
                     <Form.Group className="mb-24">
@@ -310,11 +384,19 @@ function EventDetail() {
                         <option value="sandbox">Sandbox/Integration</option>
                       </Form.Select>
                       <Form.Text className="text-muted">
-                        Select which AccruPay environment to use. "Use Default" will use the global ENV_TAG setting (currently {import.meta.env.VITE_ENV_TAG || 'development'} mode). Override this to force production or sandbox mode for this specific event.
+                        Select which AccruPay environment to use. "Use Default"
+                        will use the global ENV_TAG setting (currently{' '}
+                        {import.meta.env.VITE_ENV_TAG || 'development'} mode).
+                        Override this to force production or sandbox mode for
+                        this specific event.
                       </Form.Text>
                     </Form.Group>
 
-                    <Button type="submit" variant="primary" disabled={formLoading}>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      disabled={formLoading}
+                    >
                       <FontAwesomeIcon icon={faSave} className="me-2" />
                       {formLoading ? 'Saving...' : 'Save Integration Settings'}
                     </Button>
@@ -328,8 +410,9 @@ function EventDetail() {
                 <Card.Body>
                   <h5 className="mb-24">Public Order Confirmation API</h5>
                   <p className="text-muted mb-24">
-                    Use this API key to fetch order details from your website or external systems.
-                    This key only provides access to orders for this specific event.
+                    Use this API key to fetch order details from your website or
+                    external systems. This key only provides access to orders
+                    for this specific event.
                   </p>
 
                   <Form.Group className="mb-24">
@@ -345,18 +428,22 @@ function EventDetail() {
                         variant="outline-secondary"
                         onClick={() => copyToClipboard(event.api_key, setCopiedApiKey)}
                       >
-                        <FontAwesomeIcon icon={copiedApiKey ? faCheck : faCopy} />
+                        <FontAwesomeIcon
+                          icon={copiedApiKey ? faCheck : faCopy}
+                        />
                       </Button>
                     </div>
                     <Form.Text className="text-muted">
-                      Keep this key secure. Do not expose it in client-side code.
+                      Keep this key secure. Do not expose it in client-side
+                      code.
                     </Form.Text>
                   </Form.Group>
 
                   <h6 className="mb-16">API Endpoint</h6>
                   <div className="bg-light p-3 mb-24 rounded">
                     <code className="text-dark">
-                      GET {import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-orders?order_id=ORDER_ID
+                      GET {import.meta.env.VITE_SUPABASE_URL}
+                      /functions/v1/public-orders?order_id=ORDER_ID
                     </code>
                   </div>
 
@@ -367,23 +454,37 @@ function EventDetail() {
                       size="sm"
                       className="position-absolute top-0 end-0 m-2"
                       onClick={() => copyToClipboard(
-                        `curl -X GET "${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-orders?order_id=YOUR_ORDER_ID" \\\n  -H "X-API-Key: ${event.api_key || 'YOUR_API_KEY'}"`,
+                        `curl -X GET "${
+                          import.meta.env.VITE_SUPABASE_URL
+                        }/functions/v1/public-orders?order_id=YOUR_ORDER_ID" \\\n  -H "X-API-Key: ${
+                          event.api_key || 'YOUR_API_KEY'
+                        }"`,
                         setCopiedCurl,
                       )}
                     >
                       <FontAwesomeIcon icon={copiedCurl ? faCheck : faCopy} />
                     </Button>
-                    <pre className="text-light mb-0" style={{ fontSize: '0.85rem' }}>
-                      {`curl -X GET "${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-orders?order_id=YOUR_ORDER_ID" \\
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      {`curl -X GET "${
+                        import.meta.env.VITE_SUPABASE_URL
+                      }/functions/v1/public-orders?order_id=YOUR_ORDER_ID" \\
   -H "X-API-Key: ${event.api_key || 'YOUR_API_KEY'}"`}
                     </pre>
                   </div>
 
                   <h6 className="mb-16">Example JavaScript/Fetch Request</h6>
                   <div className="bg-dark p-3 mb-24 rounded">
-                    <pre className="text-light mb-0" style={{ fontSize: '0.85rem' }}>
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
                       {`const res = await fetch(
-  '${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-orders?order_id=YOUR_ORDER_ID',
+  '${
+    import.meta.env.VITE_SUPABASE_URL
+  }/functions/v1/public-orders?order_id=YOUR_ORDER_ID',
   {
     headers: {
       'X-API-Key': '${event.api_key || 'YOUR_API_KEY'}'
@@ -396,7 +497,10 @@ const data = await res.json();`}
 
                   <h6 className="mb-16">Response Format</h6>
                   <div className="bg-dark p-3 rounded">
-                    <pre className="text-light mb-0" style={{ fontSize: '0.85rem' }}>
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
                       {`{
   "data": {
     "id": "order-uuid",
@@ -441,8 +545,11 @@ const data = await res.json();`}
                   </div>
 
                   <div className="alert alert-info mt-24 mb-0">
-                    <strong>Note:</strong> This is a truly public endpoint that requires no authentication other than the X-API-Key header.
-                    The API key restricts access to only orders for this event. You can safely call this from client-side or server-side code.
+                    <strong>Note:</strong> This is a truly public endpoint that
+                    requires no authentication other than the X-API-Key header.
+                    The API key restricts access to only orders for this event.
+                    You can safely call this from client-side or server-side
+                    code.
                   </div>
                 </Card.Body>
               </Card>

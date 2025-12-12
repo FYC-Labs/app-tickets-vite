@@ -1,7 +1,7 @@
-import Userback from "@userback/widget";
+import Userback from '@userback/widget';
 
 let userbackInstance = null;
-const USERBACK_TOKEN = "A-ksUnFdmWEsWU3CvfGKILuh0kK";
+const USERBACK_TOKEN = 'A-ksUnFdmWEsWU3CvfGKILuh0kK';
 
 /**
  * Initialize Userback with optional user data
@@ -13,12 +13,12 @@ export const initializeUserback = async (user = null) => {
 
     if (user) {
       options.user_data = {
-        id: user.id || user.firebase_uid || "",
+        id: user.id || user.firebase_uid || '',
         info: {
-          name: user.first_name && user.last_name 
-            ? `${user.first_name} ${user.last_name}` 
-            : user.first_name || user.last_name || user.display_name || "",
-          email: user.email || "",
+          name: user.first_name && user.last_name
+            ? `${user.first_name} ${user.last_name}`
+            : user.first_name || user.last_name || user.display_name || '',
+          email: user.email || '',
         },
       };
     }
@@ -26,7 +26,7 @@ export const initializeUserback = async (user = null) => {
     // Initialize Userback
     userbackInstance = await Userback(USERBACK_TOKEN, options);
   } catch (error) {
-    console.error("Error initializing Userback:", error);
+    console.error('Error initializing Userback:', error);
   }
 };
 
@@ -42,11 +42,11 @@ export const updateUserbackUser = async (user) => {
 
   try {
     if (user) {
-      const userId = user.id || user.firebase_uid || "";
-      const userName = user.first_name && user.last_name 
-        ? `${user.first_name} ${user.last_name}` 
-        : user.first_name || user.last_name || user.display_name || "";
-      const userEmail = user.email || "";
+      const userId = user.id || user.firebase_uid || '';
+      const userName = user.first_name && user.last_name
+        ? `${user.first_name} ${user.last_name}`
+        : user.first_name || user.last_name || user.display_name || '';
+      const userEmail = user.email || '';
 
       userbackInstance.identify(userId, {
         name: userName,
@@ -57,7 +57,7 @@ export const updateUserbackUser = async (user) => {
       userbackInstance.identify(null);
     }
   } catch (error) {
-    console.error("Error updating Userback user:", error);
+    console.error('Error updating Userback user:', error);
   }
 };
 
@@ -68,4 +68,3 @@ export const destroyUserback = () => {
   // Userback doesn't have a destroy method, just reset the instance
   userbackInstance = null;
 };
-

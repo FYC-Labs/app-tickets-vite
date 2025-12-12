@@ -124,7 +124,6 @@ export const handleFieldChange = (e) => {
   };
 };
 
-
 export const handleAddField = () => {
   const currentField = $currentFormField.value;
 
@@ -155,13 +154,13 @@ export const handleAddField = () => {
 export const handleEditField = (index) => {
   const fields = $formManagerForm.value.schema;
   const field = fields[index];
-  
+
   // Convert options array back to string for editing
   const fieldToEdit = { ...field };
   if (field.options && Array.isArray(field.options)) {
     fieldToEdit.optionsString = field.options.join(', ');
   }
-  
+
   $currentFormField.value = fieldToEdit;
 
   // Remove the field temporarily - will be re-added on "Add Field"

@@ -3,12 +3,14 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendSlackNotification } from "./services/sendSlackNotification.ts";
 import { syncOrderStatusToCustomerIO } from "./services/syncOrderStatusToCustomerIO.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
 Deno.serve(async (req: Request) => {
@@ -21,7 +23,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const SUPABASE_SERVICE_ROLE_KEY =
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
@@ -30,20 +33,26 @@ Deno.serve(async (req: Request) => {
     // Use service role key to bypass RLS policies
     const supabaseClient = createClient(
       SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY
+      SUPABASE_SERVICE_ROLE_KEY,
     );
 
-    const { action, filters, id, status, paymentIntentId, items, discountCodeId, data } =
-      await req.json();
+    const {
+      action,
+      filters,
+      id,
+      status,
+      paymentIntentId,
+      items,
+      discountCodeId,
+      data,
+    } = await req.json();
 
     let result;
 
     switch (action) {
       case "getAll": {
         // Explicit select to avoid relationship ambiguity
-        let query = supabaseClient
-          .from("orders")
-          .select(`
+        let query = supabaseClient.from("orders").select(`
             id,
             event_id,
             form_submission_id,
@@ -101,7 +110,8 @@ Deno.serve(async (req: Request) => {
         // Fetch form_submissions separately to avoid the ambiguous relationship
         const { data: order, error } = await supabaseClient
           .from("orders")
-          .select(`
+          .select(
+            `
             id,
             event_id,
             form_submission_id,
@@ -137,7 +147,8 @@ Deno.serve(async (req: Request) => {
               ticket_types(name)
             ),
             discount_codes(code, type, value)
-          `)
+          `,
+          )
           .eq("id", id)
           .maybeSingle();
 
@@ -145,16 +156,19 @@ Deno.serve(async (req: Request) => {
 
         // Fetch form_submissions separately if form_submission_id exists
         if (order?.form_submission_id) {
-          const { data: formSubmission, error: formError } = await supabaseClient
-            .from("form_submissions")
-            .select(`
+          const { data: formSubmission, error: formError } =
+            await supabaseClient
+              .from("form_submissions")
+              .select(
+                `
               id,
               form_id,
               submission_data,
               forms(*)
-            `)
-            .eq("id", order.form_submission_id)
-            .maybeSingle();
+            `,
+              )
+              .eq("id", order.form_submission_id)
+              .maybeSingle();
 
           if (!formError && formSubmission) {
             order.form_submissions = formSubmission;
@@ -170,23 +184,30 @@ Deno.serve(async (req: Request) => {
         const { items, ...order } = orderData;
 
         // Determine payment environment from event or ENV_TAG
+        // Also fetch Slack webhook URL for notifications
         let paymentEnvironment: string | null = null;
+        let slackWebhookUrl: string | null = null;
         if (order.event_id) {
           const { data: event, error: eventError } = await supabaseClient
             .from("events")
-            .select("accrupay_environment")
+            .select("accrupay_environment, slack_webhook_url")
             .eq("id", order.event_id)
             .maybeSingle();
 
           if (!eventError && event) {
             // If event has explicit environment setting, use that
-            if (event.accrupay_environment === "production" || event.accrupay_environment === "sandbox") {
+            if (
+              event.accrupay_environment === "production" ||
+              event.accrupay_environment === "sandbox"
+            ) {
               paymentEnvironment = event.accrupay_environment;
             } else {
               // Otherwise, use global ENV_TAG
               const envTag = Deno.env.get("ENV_TAG") ?? "dev";
               paymentEnvironment = envTag === "prod" ? "production" : "sandbox";
             }
+            // Store Slack webhook URL if configured
+            slackWebhookUrl = event.slack_webhook_url || null;
           } else {
             // Fallback to ENV_TAG if event lookup fails
             const envTag = Deno.env.get("ENV_TAG") ?? "dev";
@@ -228,7 +249,7 @@ Deno.serve(async (req: Request) => {
         const { data: createdOrder } = await supabaseClient
           .from("orders")
           .select(
-            "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)"
+            "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
           )
           .eq("id", newOrder.id)
           .maybeSingle();
@@ -241,10 +262,23 @@ Deno.serve(async (req: Request) => {
               // Log but don't fail the order creation
               console.warn(
                 "Failed to sync order status to Customer.io on create:",
-                error
+                error,
               );
-            }
+            },
           );
+
+          // Send Slack notification if webhook is configured
+          if (slackWebhookUrl) {
+            sendSlackNotification(slackWebhookUrl, createdOrder).catch(
+              (error) => {
+                // Log but don't fail the order creation
+                console.warn(
+                  "Failed to send Slack notification on create:",
+                  error,
+                );
+              },
+            );
+          }
         }
 
         result = { data: createdOrder };
@@ -295,9 +329,9 @@ Deno.serve(async (req: Request) => {
               // Log but don't fail the status update
               console.warn(
                 "Failed to sync order status to Customer.io on update:",
-                error
+                error,
               );
-            }
+            },
           );
         }
 
@@ -412,7 +446,7 @@ Deno.serve(async (req: Request) => {
           ...corsHeaders,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 });

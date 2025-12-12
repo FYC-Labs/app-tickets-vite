@@ -24,7 +24,7 @@ function Checkout() {
   // Format preSessionData from payment session into providers format
   const providers = paymentSession?.preSessionData ? [{
     name: PAYMENT_PROCESSOR,
-    config: paymentSession.preSessionData
+    config: paymentSession.preSessionData,
   }] : null;
 
   useEffectAsync(() => {

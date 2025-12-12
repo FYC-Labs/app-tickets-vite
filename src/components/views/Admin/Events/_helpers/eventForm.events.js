@@ -22,6 +22,7 @@ export const $eventForm = Signal({
   customerio_custom_attribute_key: '',
   customerio_custom_attribute_value: '',
   accrupay_environment: '',
+  slack_webhook_url: '',
 });
 
 export const loadEvent = async (id) => {
@@ -31,8 +32,12 @@ export const loadEvent = async (id) => {
     $eventForm.update({
       title: data.title || '',
       description: data.description || '',
-      start_date: data.start_date ? new Date(data.start_date).toISOString().slice(0, 16) : '',
-      end_date: data.end_date ? new Date(data.end_date).toISOString().slice(0, 16) : '',
+      start_date: data.start_date
+        ? new Date(data.start_date).toISOString().slice(0, 16)
+        : '',
+      end_date: data.end_date
+        ? new Date(data.end_date).toISOString().slice(0, 16)
+        : '',
       location: data.location || '',
       location_lat: data.location_lat || null,
       location_lng: data.location_lng || null,
@@ -41,12 +46,16 @@ export const loadEvent = async (id) => {
       capacity: data.capacity || '',
       status: data.status || 'DRAFT',
       customerio_app_api_key: data.customerio_app_api_key || '',
-      customerio_transactional_template_id: data.customerio_transactional_template_id || '',
+      customerio_transactional_template_id:
+        data.customerio_transactional_template_id || '',
       customerio_site_id: data.customerio_site_id || '',
       customerio_track_api_key: data.customerio_track_api_key || '',
-      customerio_custom_attribute_key: data.customerio_custom_attribute_key || '',
-      customerio_custom_attribute_value: data.customerio_custom_attribute_value || '',
+      customerio_custom_attribute_key:
+        data.customerio_custom_attribute_key || '',
+      customerio_custom_attribute_value:
+        data.customerio_custom_attribute_value || '',
       accrupay_environment: data.accrupay_environment || '',
+      slack_webhook_url: data.slack_webhook_url || '',
     });
   } catch (error) {
     showToast('Error loading event', 'error');
@@ -85,12 +94,16 @@ export const handleSubmit = async (e, id, navigate) => {
       capacity: formData.capacity ? parseInt(formData.capacity, 10) : null,
       status: formData.status,
       customerio_app_api_key: formData.customerio_app_api_key || null,
-      customerio_transactional_template_id: formData.customerio_transactional_template_id || null,
+      customerio_transactional_template_id:
+        formData.customerio_transactional_template_id || null,
       customerio_site_id: formData.customerio_site_id || null,
       customerio_track_api_key: formData.customerio_track_api_key || null,
-      customerio_custom_attribute_key: formData.customerio_custom_attribute_key || null,
-      customerio_custom_attribute_value: formData.customerio_custom_attribute_value || null,
+      customerio_custom_attribute_key:
+        formData.customerio_custom_attribute_key || null,
+      customerio_custom_attribute_value:
+        formData.customerio_custom_attribute_value || null,
       accrupay_environment: formData.accrupay_environment || null,
+      slack_webhook_url: formData.slack_webhook_url || null,
     };
 
     if (id) {
@@ -109,7 +122,10 @@ export const handleSubmit = async (e, id, navigate) => {
     }
     navigate('/admin/events');
   } catch (error) {
-    showToast(error.message || `Error ${id ? 'updating' : 'creating'} event`, 'error');
+    showToast(
+      error.message || `Error ${id ? 'updating' : 'creating'} event`,
+      'error',
+    );
   } finally {
     $eventForm.loadingEnd();
   }

@@ -1,12 +1,20 @@
-import useWindowSize from '@src/utils/windowSize';
-import { Badge, Container } from 'react-bootstrap';
-import { Outlet } from 'react-router-dom';
-import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
-import { auth } from '@src/utils/firebase';
-import { $global, $user } from '@src/signals';
-import { getCurrentAuthenticatedUser, handleFirebaseLogin, handleFirebaseLogout } from '@src/utils/auth';
-import { initializeUserback, updateUserbackUser, destroyUserback } from '@src/utils/userback';
-import Loadable from '../Loadable';
+import { useEffectAsync } from "@fyclabs/tools-fyc-react/utils";
+import { $global } from "@src/signals";
+import {
+  getCurrentAuthenticatedUser,
+  handleFirebaseLogin,
+  handleFirebaseLogout,
+} from "@src/utils/auth";
+import { auth } from "@src/utils/firebase";
+import {
+  destroyUserback,
+  initializeUserback,
+  updateUserbackUser,
+} from "@src/utils/userback";
+import useWindowSize from "@src/utils/windowSize";
+import { Badge, Container } from "react-bootstrap";
+import { Outlet } from "react-router-dom";
+import Loadable from "../Loadable";
 
 const AppWrapper = () => {
   const { breakPoint } = useWindowSize();
@@ -44,7 +52,7 @@ const AppWrapper = () => {
 
   return (
     <Container fluid className="p-0">
-      {import.meta.env.VITE_DEV_IS_BREAKPOINT_VISABLE === 'true' && (
+      {import.meta.env.VITE_DEV_IS_BREAKPOINT_VISABLE === "true" && (
         <Badge bg="primary" className="breakpointBadge">
           {breakPoint}
         </Badge>

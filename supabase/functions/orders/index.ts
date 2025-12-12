@@ -333,6 +333,38 @@ Deno.serve(async (req: Request) => {
               );
             },
           );
+
+          // Send Slack notification when order status changes to PAID
+          if (status === "PAID" && order.event_id) {
+            // Fetch event's Slack webhook URL
+            const { data: event } = await supabaseClient
+              .from("events")
+              .select("slack_webhook_url")
+              .eq("id", order.event_id)
+              .maybeSingle();
+
+            if (event?.slack_webhook_url) {
+              // Fetch full order data with event and order items
+              const { data: fullOrder } = await supabaseClient
+                .from("orders")
+                .select(
+                  "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
+                )
+                .eq("id", order.id)
+                .maybeSingle();
+
+              if (fullOrder) {
+                sendSlackNotification(event.slack_webhook_url, fullOrder).catch(
+                  (error) => {
+                    console.warn(
+                      "Failed to send Slack notification on status update:",
+                      error,
+                    );
+                  },
+                );
+              }
+            }
+          }
         }
 
         result = { data: order };

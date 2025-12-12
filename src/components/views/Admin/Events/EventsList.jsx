@@ -1,9 +1,9 @@
-import { faEllipsisV, faPlus } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useEffectAsync } from "@fyclabs/tools-fyc-react/utils";
-import SignalTable from "@src/components/global/SignalTable";
-import { $events, $filter, $view } from "@src/signals";
-import { format } from "date-fns";
+import { faEllipsisV, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
+import SignalTable from '@src/components/global/SignalTable';
+import { $events, $filter, $view } from '@src/signals';
+import { format } from 'date-fns';
 import {
   Badge,
   Button,
@@ -12,14 +12,14 @@ import {
   Container,
   Dropdown,
   Row,
-} from "react-bootstrap";
-import { Link, useNavigate } from "react-router-dom";
+} from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   getStatusBadge,
   handleDelete,
   handlePublish,
   loadEvents,
-} from "./_helpers/eventsList.events";
+} from './_helpers/eventsList.events';
 
 function EventsList() {
   const navigate = useNavigate();
@@ -31,19 +31,19 @@ function EventsList() {
 
   // Define table headers
   const headers = [
-    { key: "title", value: "Title", sortKey: "title" },
-    { key: "date", value: "Date", sortKey: "start_date" },
-    { key: "location", value: "Location", sortKey: "location" },
-    { key: "status", value: "Status", sortKey: "status" },
-    { key: "actions", value: "Actions" },
+    { key: 'title', value: 'Title', sortKey: 'title' },
+    { key: 'date', value: 'Date', sortKey: 'start_date' },
+    { key: 'location', value: 'Location', sortKey: 'location' },
+    { key: 'status', value: 'Status', sortKey: 'status' },
+    { key: 'actions', value: 'Actions' },
   ];
 
   // Transform events data to table rows
   const rows = events.map((event) => ({
     id: event.id,
     title: () => <strong>{event.title}</strong>,
-    date: () => format(new Date(event.start_date), "MMM d, yyyy"),
-    location: event.location || "-",
+    date: () => format(new Date(event.start_date), 'MMM d, yyyy'),
+    location: event.location || '-',
     status: () => {
       const badge = getStatusBadge(event.status);
       return (
@@ -71,7 +71,7 @@ function EventsList() {
             <Dropdown.Item
               onClick={(e) => handlePublish(e, event.id, event.status)}
             >
-              {event.status === "PUBLISHED" ? "Unpublish" : "Publish"}
+              {event.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
             </Dropdown.Item>
             <Dropdown.Divider />
             <Dropdown.Item

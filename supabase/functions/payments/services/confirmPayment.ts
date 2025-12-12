@@ -1,8 +1,9 @@
 /* eslint-disable */
 // @ts-nocheck
 
+import { sendSlackNotification } from "../../orders/services/sendSlackNotification.ts";
 import type { ConfirmPaymentResult } from "../types/index.ts";
-import { sendTransactionalEmail, identifyCustomer } from "./customerio.ts";
+import { identifyCustomer, sendTransactionalEmail } from "./customerio.ts";
 
 /**
  * Selects the appropriate AccruPay client based on event configuration
@@ -10,21 +11,23 @@ import { sendTransactionalEmail, identifyCustomer } from "./customerio.ts";
 function selectAccruPayClient(
   clients: { production: any; sandbox: any },
   eventEnvironment: string | null,
-  envTag: string
+  envTag: string,
 ): any {
   // If event has explicit environment setting, use that
   if (eventEnvironment === "production") {
     if (!clients.production) {
-      console.warn("Production client requested but not available, falling back to sandbox");
+      console.warn(
+        "Production client requested but not available, falling back to sandbox",
+      );
       return clients.sandbox;
     }
     return clients.production;
   }
-  
+
   if (eventEnvironment === "sandbox") {
     return clients.sandbox;
   }
-  
+
   // Otherwise, use global ENV_TAG
   const defaultEnv = envTag === "prod" ? "production" : "sandbox";
   return clients[defaultEnv] || clients.sandbox;
@@ -36,15 +39,17 @@ function selectAccruPayClient(
 async function getOrderDetails(orderId: string, supabaseClient: any) {
   const { data: order, error: orderError } = await supabaseClient
     .from("orders")
-    .select(`
+    .select(
+      `
       id,
       status,
       payment_intent_id,
       payment_session_id,
       customer_email,
       event_id,
-      events!inner(accrupay_environment)
-    `)
+      events!inner(accrupay_environment, slack_webhook_url)
+    `,
+    )
     .eq("id", orderId)
     .maybeSingle();
 
@@ -60,7 +65,7 @@ async function getOrderDetails(orderId: string, supabaseClient: any) {
 async function verifyPaymentTransaction(
   order: any,
   accruPay: any,
-  envTag: string
+  envTag: string,
 ) {
   if (envTag === "prod") {
     return {
@@ -81,7 +86,7 @@ async function updateOrderStatus(
   orderId: string,
   status: "PAID" | "FAILED",
   transactionId: string | null,
-  supabaseClient: any
+  supabaseClient: any,
 ) {
   const updateData: any = {
     status,
@@ -127,7 +132,8 @@ async function updateTicketInventory(orderId: string, supabaseClient: any) {
 async function getEventAndOrderData(orderId: string, supabaseClient: any) {
   const { data: eventData, error } = await supabaseClient
     .from("orders")
-    .select(`
+    .select(
+      `
       event_id,
       customer_name,
       customer_email,
@@ -158,7 +164,8 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
         customerio_custom_attribute_key,
         customerio_custom_attribute_value
       )
-    `)
+    `,
+    )
     .eq("id", orderId)
     .single();
 
@@ -168,7 +175,7 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
       error: error.message,
       details: error.details,
       hint: error.hint,
-      code: error.code
+      code: error.code,
     });
     return null;
   }
@@ -187,7 +194,7 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
 function buildEmailTriggerData(
   eventData: any,
   orderItems: any[],
-  orderId: string
+  orderId: string,
 ) {
   const orderDetails = eventData;
   const customerName = orderDetails.customer_name || "";
@@ -205,14 +212,14 @@ function buildEmailTriggerData(
     ticketTypeName: item.ticket_type_name || "",
     quantity: item.quantity,
     unitPrice: item.unit_price,
-    subtotal: item.subtotal
+    subtotal: item.subtotal,
   }));
 
   return {
     name: eventData.customer_name || "Customer",
     email: eventData.customer_email,
     orderId: orderId,
-    purchasedAt: new Date().toISOString().split('T')[0],
+    purchasedAt: new Date().toISOString().split("T")[0],
   };
 }
 
@@ -222,16 +229,16 @@ function buildEmailTriggerData(
 function buildCustomerAttributes(
   eventData: any,
   orderItems: any[],
-  orderId: string
+  orderId: string,
 ) {
   const event = eventData.events || {};
-  
+
   // Build order items array with details
   const orderItemsArr = (orderItems || []).map((item: any) => ({
     ticketTypeName: item.ticket_type_name || item.ticket_types?.name || "",
     quantity: item.quantity,
     unitPrice: item.unit_price,
-    subtotal: item.subtotal
+    subtotal: item.subtotal,
   }));
 
   const attributes: any = {
@@ -240,14 +247,14 @@ function buildCustomerAttributes(
     first_name: eventData.customer_first_name || "",
     last_name: eventData.customer_last_name || "",
     phone: eventData.customer_phone || "",
-    
+
     // Billing details
     billing_address: eventData.billing_address || "",
     billing_address_2: eventData.billing_address_2 || "",
     billing_city: eventData.billing_city || "",
     billing_state: eventData.billing_state || "",
     billing_zip: eventData.billing_zip || "",
-    
+
     // Order details
     order_id: orderId,
     order_total: eventData.total || 0,
@@ -256,16 +263,19 @@ function buildCustomerAttributes(
     order_status: eventData.status || "",
     payment_intent_id: eventData.payment_intent_id || "",
     order_created_at: eventData.created_at || new Date().toISOString(),
-    
+
     // Event details
     event_title: event.title || "",
     event_start_date: event.start_date || "",
     event_end_date: event.end_date || "",
     event_location: event.location || "",
-    
+
     // Order items
     order_items: orderItemsArr,
-    total_tickets: orderItemsArr.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+    total_tickets: orderItemsArr.reduce(
+      (sum: number, item: any) => sum + (item.quantity || 0),
+      0,
+    ),
   };
 
   // Add custom attribute if configured
@@ -305,7 +315,7 @@ function buildCustomerAttributes(
 async function sendConfirmationEmail(
   orderId: string,
   orderItems: any[],
-  supabaseClient: any
+  supabaseClient: any,
 ) {
   try {
     const eventData = await getEventAndOrderData(orderId, supabaseClient);
@@ -316,14 +326,20 @@ async function sendConfirmationEmail(
     }
 
     if (!eventData.events) {
-      console.warn("No events relationship found in event data for order:", orderId);
+      console.warn(
+        "No events relationship found in event data for order:",
+        orderId,
+      );
       return null;
     }
 
     const event = eventData.events;
 
     // Send transactional email if configured
-    if (event.customerio_app_api_key && event.customerio_transactional_template_id) {
+    if (
+      event.customerio_app_api_key &&
+      event.customerio_transactional_template_id
+    ) {
       const triggerData = buildEmailTriggerData(eventData, orderItems, orderId);
 
       const emailResult = await sendTransactionalEmail(
@@ -331,19 +347,25 @@ async function sendConfirmationEmail(
           appApiKey: event.customerio_app_api_key,
           transactionalTemplateId: event.customerio_transactional_template_id,
         },
-        triggerData
+        triggerData,
       );
 
       if (!emailResult.success) {
         console.warn("Customer.io email failed:", emailResult.error);
       }
     } else {
-      console.warn("Customer.io transactional email not configured for this event");
+      console.warn(
+        "Customer.io transactional email not configured for this event",
+      );
     }
 
     // Identify customer in Customer.io if Track API is configured
     if (event.customerio_site_id && event.customerio_track_api_key) {
-      const customerAttributes = buildCustomerAttributes(eventData, orderItems, orderId);
+      const customerAttributes = buildCustomerAttributes(
+        eventData,
+        orderItems,
+        orderId,
+      );
 
       const identifyResult = await identifyCustomer(
         {
@@ -351,11 +373,14 @@ async function sendConfirmationEmail(
           trackApiKey: event.customerio_track_api_key,
         },
         eventData.customer_email,
-        customerAttributes
+        customerAttributes,
       );
 
       if (identifyResult.success) {
-        console.log("Customer identified successfully in Customer.io:", eventData.customer_email);
+        console.log(
+          "Customer identified successfully in Customer.io:",
+          eventData.customer_email,
+        );
       } else {
         console.warn("Customer.io identify failed:", identifyResult.error);
       }
@@ -366,8 +391,11 @@ async function sendConfirmationEmail(
     return { success: true };
   } catch (emailError: any) {
     // Log the error but don't fail the payment confirmation
-    console.warn("Failed to send Customer.io email/identify, but payment was successful:", emailError.message);
-    return { error: 'failed to send email or identify customer' };
+    console.warn(
+      "Failed to send Customer.io email/identify, but payment was successful:",
+      emailError.message,
+    );
+    return { error: "failed to send email or identify customer" };
   }
 }
 
@@ -377,7 +405,7 @@ async function sendConfirmationEmail(
 async function handlePaymentFailure(
   orderId: string,
   paymentError: any,
-  supabaseClient: any
+  supabaseClient: any,
 ) {
   console.error("Payment verification error:", paymentError);
   console.error("Error details:", JSON.stringify(paymentError, null, 2));
@@ -386,7 +414,10 @@ async function handlePaymentFailure(
 
   // Check for GraphQL errors
   if (paymentError.graphQLErrors) {
-    console.error("GraphQL errors:", JSON.stringify(paymentError.graphQLErrors, null, 2));
+    console.error(
+      "GraphQL errors:",
+      JSON.stringify(paymentError.graphQLErrors, null, 2),
+    );
   }
   if (paymentError.networkError) {
     console.error("Network error:", paymentError.networkError);
@@ -405,7 +436,7 @@ export async function confirmPayment(
   orderId: string,
   supabaseClient: any,
   accruPayClients: { production: any; sandbox: any },
-  envTag: string
+  envTag: string,
 ): Promise<ConfirmPaymentResult> {
   try {
     // Step 1: Get order details (including event's AccruPay environment setting)
@@ -415,22 +446,24 @@ export async function confirmPayment(
     const accruPay = selectAccruPayClient(
       accruPayClients,
       order.events?.accrupay_environment || null,
-      envTag
+      envTag,
     );
-    
+
     const selectedEnv = order.events?.accrupay_environment || "default";
-    console.log(`Using AccruPay environment for confirmation: ${selectedEnv} (ENV_TAG: ${envTag})`);
+    console.log(
+      `Using AccruPay environment for confirmation: ${selectedEnv} (ENV_TAG: ${envTag})`,
+    );
 
     // Step 2: Verify payment with Accrupay
     const verifiedTransaction = await verifyPaymentTransaction(
       order,
       accruPay,
-      envTag
+      envTag,
     );
 
     if (verifiedTransaction.status !== "SUCCEEDED") {
       throw new Error(
-        `Payment verification failed: ${verifiedTransaction.status}`
+        `Payment verification failed: ${verifiedTransaction.status}`,
       );
     }
 
@@ -439,24 +472,46 @@ export async function confirmPayment(
       orderId,
       "PAID",
       verifiedTransaction.id,
-      supabaseClient
+      supabaseClient,
     );
 
     // Step 4: Update ticket inventory
     const orderItems = await updateTicketInventory(orderId, supabaseClient);
 
-    // Step 5: Send confirmation email
+    // Step 5: Send Slack notification if webhook is configured
+    const slackWebhookUrl = order.events?.slack_webhook_url;
+    if (slackWebhookUrl) {
+      // Fetch full order data with event and order items for Slack notification
+      const { data: fullOrder } = await supabaseClient
+        .from("orders")
+        .select(
+          "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
+        )
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (fullOrder) {
+        sendSlackNotification(slackWebhookUrl, fullOrder).catch((error) => {
+          console.warn(
+            "Failed to send Slack notification on payment confirmation:",
+            error,
+          );
+        });
+      }
+    }
+
+    // Step 6: Send confirmation email
     const triggerData = await sendConfirmationEmail(
       orderId,
       orderItems,
-      supabaseClient
+      supabaseClient,
     );
 
     return {
       data: {
         status: "success",
         orderId: orderId,
-        triggerData
+        triggerData,
       },
     };
   } catch (paymentError: any) {
@@ -466,4 +521,3 @@ export async function confirmPayment(
     throw paymentError;
   }
 }
-

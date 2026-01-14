@@ -13,6 +13,7 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
       `
       id,
       event_id,
+      form_submission_id,
       customer_name,
       customer_email,
       customer_first_name,
@@ -64,6 +65,42 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
     return null;
   }
 
+  let formSubmission = null;
+  
+  if (orderData.form_submission_id) {
+    const { data: submission, error: submissionError } = await supabaseClient
+      .from("form_submissions")
+      .select("responses")
+      .eq("id", orderData.form_submission_id)
+      .maybeSingle();
+
+    if (!submissionError && submission) {
+      formSubmission = submission;
+    }
+  }
+
+  if (!formSubmission) {
+    const { data: submission, error: submissionError } = await supabaseClient
+      .from("form_submissions")
+      .select("responses")
+      .eq("order_id", orderId)
+      .maybeSingle();
+
+    if (!submissionError && submission) {
+      formSubmission = submission;
+    }
+  }
+
+  orderData.form_submissions = formSubmission;
+
+  console.log("[DEBUG] Form submissions data:", {
+    orderId,
+    form_submission_id: orderData.form_submission_id,
+    form_submissions: orderData.form_submissions,
+    form_submissions_type: typeof orderData.form_submissions,
+    is_array: Array.isArray(orderData.form_submissions),
+  });
+
   return orderData;
 }
 
@@ -81,12 +118,20 @@ function buildCustomerAttributes(orderData: any) {
     subtotal: item.subtotal,
   }));
 
+  const formResponses = orderData.form_submissions?.responses || null;
+
+  const formPhoneNumber = formResponses?.phone_number || null;
+  const formPreferredChannel = formResponses?.preferred_channel || null;
+
   const attributes: any = {
     // Customer details
     name: orderData.customer_name || "",
     first_name: orderData.customer_first_name || "",
     last_name: orderData.customer_last_name || "",
-    phone: orderData.customer_phone || "",
+    phone: formPhoneNumber || orderData.customer_phone || "",
+    preferred_channel: formPreferredChannel
+      ? formPreferredChannel.toLowerCase()
+      : null,
 
     // Billing details
     billing_address: orderData.billing_address || "",
@@ -116,7 +161,18 @@ function buildCustomerAttributes(orderData: any) {
       (sum: number, item: any) => sum + (item.quantity || 0),
       0,
     ),
+
+    form_responses: formResponses,
   };
+
+  console.log("[DEBUG] Form responses extraction:", {
+    form_submissions_raw: orderData.form_submissions,
+    form_responses_extracted: formResponses,
+    phone_number_from_form: formPhoneNumber,
+    preferred_channel_from_form: formPreferredChannel,
+    final_phone_in_attributes: attributes.phone,
+    final_preferred_channel_in_attributes: attributes.preferred_channel,
+  });
 
   // Add custom attribute if configured
   const customKey = event.customerio_custom_attribute_key;
@@ -190,6 +246,15 @@ export async function syncOrderStatusToCustomerIO(
     }
 
     const customerAttributes = buildCustomerAttributes(orderData);
+
+    console.log("[DEBUG] Customer attributes before Customer.io sync:", {
+      orderId,
+      customer_email: orderData.customer_email,
+      form_responses: customerAttributes.form_responses,
+      has_form_responses: !!customerAttributes.form_responses,
+      phone: customerAttributes.phone,
+      preferred_channel: customerAttributes.preferred_channel,
+    });
 
     const identifyResult = await identifyCustomer(
       {

@@ -87,9 +87,10 @@ export const calculateTotals = () => {
   });
 };
 
-export const handleFieldChange = (fieldId, value) => {
+export const handleFieldChange = (fieldId, value, fieldIdString = null) => {
   const formData = { ...$embed.value.formData };
-  formData[fieldId] = value;
+  const key = fieldIdString !== null ? fieldIdString : fieldId;
+  formData[key] = value;
   $embed.update({ formData });
   checkFormValidity();
 };
@@ -133,8 +134,11 @@ export const validateForm = () => {
 
   if (form?.schema) {
     for (const field of form.schema) {
-      if (field.required && !formData[field.label]) {
-        return `${field.label} is required`;
+      if (field.required) {
+        const key = field.field_id_string !== null && field.field_id_string !== undefined ? field.field_id_string : field.label;
+        if (!formData[key]) {
+          return `${field.label} is required`;
+        }
       }
     }
   }
@@ -149,6 +153,12 @@ export const validateForm = () => {
   }
 
   return null;
+};
+
+const isValidUSPhone = (phone) => {
+  if (!phone) return false;
+  const digitsOnly = phone.replace(/\D/g, '');
+  return digitsOnly.length === 10;
 };
 
 export const checkFormValidity = () => {
@@ -171,8 +181,13 @@ export const checkFormValidity = () => {
   if (form?.schema) {
     for (const field of form.schema) {
       if (field.required) {
-        const value = formData[field.label];
+        const key = field.field_id_string !== null && field.field_id_string !== undefined ? field.field_id_string : field.label;
+        const value = formData[key];
         if (!value || (typeof value === 'string' && !value.trim())) {
+          $embed.update({ isFormValid: false });
+          return;
+        }
+        if (field.type === 'tel' && !isValidUSPhone(value)) {
           $embed.update({ isFormValid: false });
           return;
         }

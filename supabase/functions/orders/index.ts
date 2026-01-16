@@ -257,6 +257,20 @@ Deno.serve(async (req: Request) => {
         // Sync order status to Customer.io (for PENDING orders)
         // This allows Customer.io to identify customers with incomplete purchases
         if (createdOrder) {
+          if (createdOrder.form_submission_id) {
+            const { error: updateSubmissionError } = await supabaseClient
+              .from("form_submissions")
+              .update({ order_id: createdOrder.id })
+              .eq("id", createdOrder.form_submission_id);
+
+            if (updateSubmissionError) {
+              console.warn(
+                "Failed to update form_submission with order_id:",
+                updateSubmissionError,
+              );
+            }
+          }
+
           syncOrderStatusToCustomerIO(createdOrder.id, supabaseClient).catch(
             (error) => {
               // Log but don't fail the order creation

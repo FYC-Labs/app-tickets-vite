@@ -344,6 +344,15 @@ function FormsManager({ eventId, tickets, onUpdate }) {
                         signal={$currentFormField}
                       />
                     </Form.Group>
+                    <Form.Group className="mb-16">
+                      <Form.Label>Field ID String</Form.Label>
+                      <UniversalInput
+                        type="text"
+                        name="field_id_string"
+                        signal={$currentFormField}
+                        placeholder="e.g., phone_number"
+                      />
+                    </Form.Group>
 
                     <Form.Group className="mb-16">
                       <Form.Label>Instructions</Form.Label>

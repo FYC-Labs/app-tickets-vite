@@ -3,6 +3,7 @@ import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import Loader from '@src/components/global/Loader';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
+import { formatPhone } from '@src/components/global/Inputs/UniversalInput/_helpers/universalinput.events';
 import {
   loadFormData,
   handleFieldChange,
@@ -23,7 +24,8 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
   }, [formId, eventId]);
 
   const renderField = (field, index) => {
-    const value = formData[field.label] || '';
+    const key = field.field_id_string !== null && field.field_id_string !== undefined ? field.field_id_string : field.label;
+    const value = formData[key] || '';
 
     switch (field.type) {
       case 'textarea':
@@ -38,7 +40,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               name={`field_${index}`}
               placeholder={field.placeholder}
               value={value}
-              customOnChange={(e) => handleFieldChange(field.label, e.target.value)}
+              customOnChange={(e) => handleFieldChange(field.label, e.target.value, field.field_id_string)}
               required={field.required}
             />
             {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
@@ -55,7 +57,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               as="select"
               name={`field_${index}`}
               value={value}
-              customOnChange={(e) => handleFieldChange(field.label, e.target.value)}
+              customOnChange={(e) => handleFieldChange(field.label, e.target.value, field.field_id_string)}
               required={field.required}
             >
               <option value="">Select...</option>
@@ -77,7 +79,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               name={`field_${index}`}
               label={field.label}
               checked={!!value}
-              customOnChange={(e) => handleFieldChange(field.label, e.target.checked)}
+              customOnChange={(e) => handleFieldChange(field.label, e.target.checked, field.field_id_string)}
               required={field.required}
             />
             {field.instructions && <Form.Text className="text-muted d-block">{field.instructions}</Form.Text>}
@@ -98,10 +100,35 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                 name={field.label}
                 value={option}
                 checked={value === option}
-                onChange={(e) => handleFieldChange(field.label, e.target.value)}
+                onChange={(e) => handleFieldChange(field.label, e.target.value, field.field_id_string)}
                 required={field.required}
               />
             ))}
+            {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
+          </Form.Group>
+        );
+
+      case 'tel':
+        return (
+          <Form.Group key={index} className="mb-24">
+            <Form.Label>
+              {field.label} {field.required && <span className="text-danger">*</span>}
+            </Form.Label>
+            <UniversalInput
+              type="tel"
+              name={`field_${index}`}
+              placeholder={field.placeholder || '(123) 456-7890'}
+              value={value}
+              customOnChange={(e) => {
+                const inputValue = e.target.value;
+                const digitsOnly = inputValue.replace(/\D/g, '');
+                const limitedDigits = digitsOnly.slice(0, 10);
+                const formatted = formatPhone(limitedDigits);
+                handleFieldChange(field.label, formatted, field.field_id_string);
+              }}
+              required={field.required}
+              maxLength={14}
+            />
             {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
           </Form.Group>
         );
@@ -117,7 +144,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
               name={`field_${index}`}
               placeholder={field.placeholder}
               value={value}
-              customOnChange={(e) => handleFieldChange(field.label, e.target.value)}
+              customOnChange={(e) => handleFieldChange(field.label, e.target.value, field.field_id_string)}
               required={field.required}
             />
             {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
@@ -160,13 +187,14 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
           </Form.Group>
 
           <Form.Group className="mb-24">
-            <Form.Label>Name</Form.Label>
+            <Form.Label>Name *</Form.Label>
             <UniversalInput
               type="text"
               name="name"
               placeholder="Your name"
               value={formData.name || ''}
               customOnChange={(e) => handleFieldChange('name', e.target.value)}
+              required
             />
           </Form.Group>
 

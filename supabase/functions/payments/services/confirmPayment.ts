@@ -135,6 +135,7 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
     .select(
       `
       event_id,
+      form_submission_id,
       customer_name,
       customer_email,
       customer_first_name,
@@ -184,6 +185,37 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
     console.warn("No event data found for order:", orderId);
     return null;
   }
+
+  // Fetch form_submissions separately to avoid relationship ambiguity
+  let formSubmission = null;
+  
+  if (eventData.form_submission_id) {
+    const { data: submission, error: submissionError } = await supabaseClient
+      .from("form_submissions")
+      .select("responses")
+      .eq("id", eventData.form_submission_id)
+      .maybeSingle();
+
+    if (!submissionError && submission) {
+      formSubmission = submission;
+    }
+  }
+
+  // If not found via form_submission_id, try via order_id
+  if (!formSubmission) {
+    const { data: submission, error: submissionError } = await supabaseClient
+      .from("form_submissions")
+      .select("responses")
+      .eq("order_id", orderId)
+      .maybeSingle();
+
+    if (!submissionError && submission) {
+      formSubmission = submission;
+    }
+  }
+
+  // Attach form_submission to eventData for consistency
+  eventData.form_submissions = formSubmission;
 
   return eventData;
 }
@@ -241,12 +273,24 @@ function buildCustomerAttributes(
     subtotal: item.subtotal,
   }));
 
+  // Extract form responses
+  const formResponses = eventData.form_submissions?.responses || null;
+
+  // Extract phone_number and preferred_channel from form responses
+  const formPhoneNumber = formResponses?.phone_number || null;
+  const formPreferredChannel = formResponses?.preferred_channel || null;
+
   const attributes: any = {
     // Customer details
     name: eventData.customer_name || "",
     first_name: eventData.customer_first_name || "",
     last_name: eventData.customer_last_name || "",
-    phone: eventData.customer_phone || "",
+    // Prefer phone_number from form responses, fallback to customer_phone from order
+    phone: formPhoneNumber || eventData.customer_phone || "",
+    // Add preferred_channel from form responses (can be "sms" or "email")
+    preferred_channel: formPreferredChannel
+      ? formPreferredChannel.toLowerCase()
+      : null,
 
     // Billing details
     billing_address: eventData.billing_address || "",
@@ -276,6 +320,9 @@ function buildCustomerAttributes(
       (sum: number, item: any) => sum + (item.quantity || 0),
       0,
     ),
+
+    // Form submission responses
+    form_responses: formResponses,
   };
 
   // Add custom attribute if configured

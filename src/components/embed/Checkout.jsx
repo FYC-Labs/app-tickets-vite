@@ -50,7 +50,10 @@ function Checkout() {
 
   useEffectAsync(async () => {
     const { order: orderData, paymentSession: currentSession } = $checkout.value;
-    if (orderData && orderData.status === 'PENDING' && !currentSession) {
+    const orderTotal = parseFloat(orderData?.total) || 0;
+    const isFreeOrder = orderTotal === 0;
+
+    if (orderData && orderData.status === 'PENDING' && !currentSession && !isFreeOrder) {
       try {
         let session = await resolvers.fetchPaymentSession(orderId);
         if (!session) {
@@ -115,13 +118,21 @@ function Checkout() {
         <Col md={12}>
           <OrderSummary order={order} />
 
+          {/* Check if order is free (100% discount) */}
+          {order && parseFloat(order.total) === 0 && order.status === 'PENDING' && (
+            <Alert variant="success" className="mb-24">
+              <Alert.Heading>No Payment Required</Alert.Heading>
+              <p>Your order has a 100% discount applied. No payment is required. Your order will be automatically confirmed.</p>
+            </Alert>
+          )}
+
           {/* Show loader when payment session is loading (and no errors) */}
-          {order && order.status === 'PENDING' && !paymentStatus && !sessionInitError.value && !paymentSession && (
+          {order && order.status === 'PENDING' && parseFloat(order.total) > 0 && !paymentStatus && !sessionInitError.value && !paymentSession && (
             <CardLoader message="Initializing payment form..." />
           )}
 
           {/* Show payment form when everything is ready and no critical errors */}
-          {order && providers && paymentSession && !paymentStatus && !sessionInitError.value && (
+          {order && parseFloat(order.total) > 0 && providers && paymentSession && !paymentStatus && !sessionInitError.value && (
             <Card>
               <Card.Body>
                 <Row>

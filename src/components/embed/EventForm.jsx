@@ -8,6 +8,7 @@ import {
   loadFormData,
   handleFieldChange,
   handleTicketChange,
+  handleUpsellingChange,
   handleApplyDiscount,
   handleSubmit,
   updateDiscountCode,
@@ -15,9 +16,9 @@ import {
 
 function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
   const { form } = $embed.value;
-  const { tickets } = $embed.value;
+  const { tickets, upsellings } = $embed.value;
   const { isLoading } = $embed.value;
-  const { error, formData, selectedTickets, discountCode, appliedDiscount, totals, isFormValid } = $embed.value;
+  const { error, formData, selectedTickets, selectedUpsellings, discountCode, appliedDiscount, totals, isFormValid } = $embed.value;
 
   useEffectAsync(async () => {
     await loadFormData(formId, eventId);
@@ -273,6 +274,54 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                     </small>
                   )}
                 </div>
+              )}
+
+              {upsellings.length > 0 && (
+              <div className="mb-32">
+                <h5 className="mb-24">Select Upsellings</h5>
+                {upsellings.map((upselling) => {
+                  const available = upselling.quantity - (upselling.sold || 0);
+                  return (
+                    <Card key={upselling.id} className="mb-24 border-0 shadow-none bg-transparent">
+                      <Card.Body>
+                        <Row className="align-items-center">
+                          <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
+                            <h6 className="mb-8">{upselling.name}</h6>
+                            {upselling.description && (
+                            <p className="text-muted small mb-0">{upselling.description}</p>
+                            )}
+                            {upselling.benefits && (
+                            <p className="text-muted small mb-0">{upselling.benefits}</p>
+                            )}
+                            <strong>
+                              ${parseFloat(upselling.price).toFixed(2)}
+                            </strong>
+                          </Col>
+                          {/* {form?.show_tickets_remaining !== false && (
+                          <Col md={3} className="text-muted small">
+                            {available > 0 ? `${available} available` : 'Sold out'}
+                          </Col>
+                        )} */}
+                          <Col md={3}>
+                            <Form.Label>Quantity</Form.Label>
+                            <UniversalInput
+                              as="select"
+                              name={`upselling_${upselling.id}`}
+                              value={selectedUpsellings[upselling.id] || 0}
+                              customOnChange={e => handleUpsellingChange(upselling.id, Number(e.target.value))}
+                              disabled={available === 0}
+                            >
+                              {[...Array(available + 1).keys()].map(n => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </UniversalInput>
+                          </Col>
+                        </Row>
+                      </Card.Body>
+                    </Card>
+                  );
+                })}
+              </div>
               )}
 
               {totals.subtotal > 0 && (

@@ -8,6 +8,7 @@ export const $formManagerForm = Signal({
   name: '',
   description: '',
   available_ticket_ids: [],
+  available_upselling_ids: [],
   schema: [],
   is_published: false,
   show_title: true,
@@ -56,6 +57,7 @@ export const handleOpenModal = (form = null) => {
       name: form.name,
       description: form.description || '',
       available_ticket_ids: form.available_ticket_ids || [],
+      available_upselling_ids: form.available_upselling_ids || [],
       schema: form.schema || [],
       is_published: form.is_published || false,
       show_title: form.show_title !== undefined ? form.show_title : true,
@@ -110,6 +112,20 @@ export const handleTicketSelection = (ticketId) => {
   $formManagerForm.value = {
     ...$formManagerForm.value,
     available_ticket_ids: newIds,
+  };
+};
+
+export const handleUpsellingSelection = (upsellingId) => {
+  const currentIds = $formManagerForm.value.available_upselling_ids;
+  const isSelected = currentIds?.includes(upsellingId) || false;
+
+  const newIds = isSelected
+    ? currentIds?.filter(id => id !== upsellingId) || []
+    : [...currentIds, upsellingId];
+
+  $formManagerForm.value = {
+    ...$formManagerForm.value,
+    available_upselling_ids: newIds,
   };
 };
 
@@ -220,6 +236,7 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       description: formData.description,
       event_id: eventId,
       available_ticket_ids: formData.available_ticket_ids,
+      available_upselling_ids: formData.available_upselling_ids,
       schema: formData.schema,
       is_published: formData.is_published,
       show_title: formData.show_title,

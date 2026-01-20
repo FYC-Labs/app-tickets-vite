@@ -4,6 +4,7 @@ import formsAPI from '@src/api/forms.api';
 import ticketsAPI from '@src/api/tickets.api';
 import ordersAPI from '@src/api/orders.api';
 import discountsAPI from '@src/api/discounts.api';
+import upsellingsAPI from '@src/api/upsellings.api';
 
 export const loadFormData = async (formId, eventId) => {
   try {
@@ -34,6 +35,15 @@ export const loadFormData = async (formId, eventId) => {
         });
 
         $embed.update({ tickets: filtered });
+
+        const upsellingsData = await upsellingsAPI.getByEventId(formData.event_id);
+        let filteredUpsellings = upsellingsData || [];
+
+        if (formData.available_upselling_ids && formData.available_upselling_ids.length > 0) {
+          filteredUpsellings = filteredUpsellings.filter((u) => formData.available_upselling_ids.includes(u.id));
+        }
+
+        $embed.update({ upsellings: filteredUpsellings });
       }
     } else if (eventId) {
       const ticketsData = await ticketsAPI.getByEventId(eventId);
@@ -55,7 +65,7 @@ export const loadFormData = async (formId, eventId) => {
 };
 
 export const calculateTotals = () => {
-  const { selectedTickets, appliedDiscount, tickets } = $embed.value;
+  const { selectedTickets, selectedUpsellings, appliedDiscount, tickets, upsellings } = $embed.value;
 
   let subtotal = 0;
   Object.entries(selectedTickets).forEach(([ticketId, quantity]) => {
@@ -63,6 +73,15 @@ export const calculateTotals = () => {
       const ticket = tickets.find((t) => t.id === ticketId);
       if (ticket) {
         subtotal += parseFloat(ticket.price) * quantity;
+      }
+    }
+  });
+
+  Object.entries(selectedUpsellings).forEach(([upsellingId, quantity]) => {
+    if (quantity > 0) {
+      const upselling = upsellings.find((u) => u.id === upsellingId);
+      if (upselling) {
+        subtotal += parseFloat(upselling.price) * quantity;
       }
     }
   });
@@ -129,8 +148,16 @@ export const handleApplyDiscount = async (formId, eventId) => {
   }
 };
 
+export const handleUpsellingChange = (upsellingId, quantity) => {
+  const selectedUpsellings = { ...$embed.value.selectedUpsellings };
+  selectedUpsellings[upsellingId] = parseInt(quantity, 10) || 0;
+  $embed.update({ selectedUpsellings });
+  calculateTotals();
+  checkFormValidity();
+};
+
 export const validateForm = () => {
-  const { form, formData, selectedTickets, tickets } = $embed.value;
+  const { form, formData, selectedTickets, selectedUpsellings, tickets, upsellings } = $embed.value;
 
   if (form?.schema) {
     for (const field of form.schema) {
@@ -146,6 +173,11 @@ export const validateForm = () => {
   const hasTickets = Object.values(selectedTickets).some((qty) => qty > 0);
   if (tickets.length > 0 && !hasTickets) {
     return 'Please select at least one ticket';
+  }
+
+  const hasUpsellings = Object.values(selectedUpsellings).some((qty) => qty > 0);
+  if (upsellings.length > 0 && !hasUpsellings) {
+    return 'Please select at least one upselling';
   }
 
   if (!formData.email) {
@@ -164,7 +196,6 @@ const isValidUSPhone = (phone) => {
 export const checkFormValidity = () => {
   const { form, formData, selectedTickets, tickets } = $embed.value;
 
-  // Check email is present and valid
   if (!formData.email || !formData.email.trim()) {
     $embed.update({ isFormValid: false });
     return;
@@ -204,7 +235,6 @@ export const checkFormValidity = () => {
     }
   }
 
-  // All validations passed
   $embed.update({ isFormValid: true });
 };
 
@@ -221,7 +251,7 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
     $embed.loadingStart();
     $embed.update({ error: null });
 
-    const { form, formData, selectedTickets, appliedDiscount, totals, tickets } = $embed.value;
+    const { form, formData, selectedTickets, selectedUpsellings, appliedDiscount, totals, tickets, upsellings } = $embed.value;
     let submissionId = null;
 
     if (form) {
@@ -230,9 +260,10 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
     }
 
     const hasTickets = Object.values(selectedTickets).some((qty) => qty > 0);
-
+    const hasUpsellings = Object.values(selectedUpsellings).some((qty) => qty > 0);
+    let orderItems = [];
     if (hasTickets) {
-      const orderItems = Object.entries(selectedTickets)
+      orderItems = Object.entries(selectedTickets)
         .filter(([, quantity]) => quantity > 0)
         .map(([ticketId, quantity]) => {
           const ticket = tickets.find((t) => t.id === ticketId);
@@ -242,6 +273,20 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
             unit_price: parseFloat(ticket.price),
           };
         });
+
+      if (hasUpsellings) {
+        const upsellingOrderItems = Object.entries(selectedUpsellings)
+          .filter(([, quantity]) => quantity > 0)
+          .map(([upsellingId, quantity]) => {
+            const upselling = upsellings.find((u) => u.id === upsellingId);
+            return {
+              upselling_id: upsellingId,
+              quantity,
+              unit_price: parseFloat(upselling.price),
+            };
+          });
+        orderItems.push(...upsellingOrderItems);
+      }
 
       const orderData = {
         event_id: form?.event_id || eventId,
@@ -265,6 +310,7 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
       onSubmitSuccess({ submission: submissionId });
     }
   } catch (err) {
+    console.log('err', err);
     $embed.update({ error: 'Error submitting form. Please try again.' });
   } finally {
     $embed.loadingEnd();

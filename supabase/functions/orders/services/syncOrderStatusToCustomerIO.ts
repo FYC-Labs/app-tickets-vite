@@ -45,7 +45,8 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
         quantity,
         unit_price,
         subtotal,
-        ticket_types(name)
+        ticket_types(name),
+        upsellings(name)
       )
     `,
     )
@@ -93,14 +94,6 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
 
   orderData.form_submissions = formSubmission;
 
-  console.log("[DEBUG] Form submissions data:", {
-    orderId,
-    form_submission_id: orderData.form_submission_id,
-    form_submissions: orderData.form_submissions,
-    form_submissions_type: typeof orderData.form_submissions,
-    is_array: Array.isArray(orderData.form_submissions),
-  });
-
   return orderData;
 }
 
@@ -113,6 +106,8 @@ function buildCustomerAttributes(orderData: any) {
   // Build order items array with details
   const orderItemsArr = (orderData.order_items || []).map((item: any) => ({
     ticketTypeName: item.ticket_types?.name || "",
+    upsellingName: item.upsellings?.name || "",
+    upsellingId: item.upsellings?.id || "",
     quantity: item.quantity,
     unitPrice: item.unit_price,
     subtotal: item.subtotal,
@@ -164,15 +159,6 @@ function buildCustomerAttributes(orderData: any) {
 
     form_responses: formResponses,
   };
-
-  console.log("[DEBUG] Form responses extraction:", {
-    form_submissions_raw: orderData.form_submissions,
-    form_responses_extracted: formResponses,
-    phone_number_from_form: formPhoneNumber,
-    preferred_channel_from_form: formPreferredChannel,
-    final_phone_in_attributes: attributes.phone,
-    final_preferred_channel_in_attributes: attributes.preferred_channel,
-  });
 
   // Add custom attribute if configured
   const customKey = event.customerio_custom_attribute_key;

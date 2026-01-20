@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import GooglePlacesAutocomplete from '@src/components/global/Inputs/GooglePlacesAutocomplete';
 import Loader from '@src/components/global/Loader';
-import { $events, $tickets } from '@src/signals';
+import { $events, $tickets, $upsellings } from '@src/signals';
 import { useState } from 'react';
 import {
   Badge,
@@ -26,6 +26,7 @@ import DiscountsManager from './DiscountsManager';
 import FormsManager from './FormsManager';
 import SalesManager from './SalesManager';
 import TicketsManager from './TicketsManager';
+import UpsellingsManager from './UpsellingsManager';
 import { getStatusBadge, loadEventData } from './_helpers/eventDetail.events';
 import {
   $eventForm,
@@ -39,6 +40,7 @@ function EventDetail() {
   const navigate = useNavigate();
   const event = $events.value.current;
   const tickets = $tickets.value.list;
+  const upsellings = $upsellings.value.list;
   const loading = $events.value.isLoading;
   const formData = $eventForm.value;
   const formLoading = $eventForm.value.isLoading;
@@ -206,6 +208,15 @@ function EventDetail() {
               <FormsManager
                 eventId={id}
                 tickets={tickets}
+                upsellings={upsellings}
+                onUpdate={() => loadEventData(id)}
+              />
+            </Tab>
+
+            <Tab eventKey="upsellings" title="Upsellings">
+              <UpsellingsManager
+                eventId={id}
+                upsellings={upsellings}
                 onUpdate={() => loadEventData(id)}
               />
             </Tab>

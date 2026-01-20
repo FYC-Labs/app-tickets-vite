@@ -17,6 +17,7 @@ import {
   handleOpenModal,
   handleCloseModal,
   handleTicketSelection,
+  handleUpsellingSelection,
   handleAddField,
   handleEditField,
   handleDeleteField,
@@ -88,7 +89,7 @@ function DraggableField({ field, index, onMoveField, onEdit, onDelete }) {
   );
 }
 
-function FormsManager({ eventId, tickets, onUpdate }) {
+function FormsManager({ eventId, tickets, upsellings, onUpdate }) {
   const forms = $forms.value.list;
   const { showModal, showEmbedModal, editingForm, embedCode, eventListenerCode } = $formManagerUI.value;
   const formData = $formManagerForm.value;
@@ -300,6 +301,31 @@ function FormsManager({ eventId, tickets, onUpdate }) {
                           }}
                           label={`${ticket.name} - $${parseFloat(ticket.price).toFixed(2)}`}
                           id={`ticket-${ticket.id}`}
+                        />
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                <div className="mb-24">
+                  <Form.Label className="d-block mb-16">Available Upsellings</Form.Label>
+                  {upsellings.length === 0 ? (
+                    <div className="text-muted small">
+                      No upsellings available. Add upsellings to this event first.
+                    </div>
+                  ) : (
+                    <>
+                      {upsellings.map((upselling) => (
+                        <UniversalInput
+                          type="checkbox"
+                          name={`upselling_${upselling.id}`}
+                          signal={$formManagerForm}
+                          checked={formData.available_upselling_ids.includes(upselling.id)}
+                          onChange={() => {
+                            handleUpsellingSelection(upselling.id);
+                          }}
+                          label={`${upselling.name} - $${parseFloat(upselling.price).toFixed(2)}`}
+                          id={`upselling-${upselling.id}`}
                         />
                       ))}
                     </>

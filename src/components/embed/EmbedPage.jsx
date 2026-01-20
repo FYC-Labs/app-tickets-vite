@@ -10,6 +10,7 @@ function EmbedPage() {
   const confirmationUrlOverride = searchParams.get('confirmationUrl');
 
   const handleSubmitSuccess = (data) => {
+    console.log('data', data);
     if (data.order) {
       // Build checkout URL with embed=true and optional confirmationUrl
       const params = new URLSearchParams();

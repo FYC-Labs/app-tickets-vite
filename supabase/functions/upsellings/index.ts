@@ -32,51 +32,51 @@ Deno.serve(async (req: Request) => {
       SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const { action, id, eventId, ticketTypeId, quantity, data } =
+    const { action, id, eventId, upsellingId, quantity, data } =
       await req.json();
 
     let result;
 
     switch (action) {
       case "getByEventId": {
-        const { data: tickets, error } = await supabaseClient
-          .from("ticket_types")
+        const { data: upsellings, error } = await supabaseClient
+          .from("upsellings")
           .select("*")
           .eq("event_id", eventId)
           .order("created_at", { ascending: true });
 
         if (error) throw error;
-        result = { data: tickets };
+        result = { data: upsellings };
         break;
       }
 
       case "getById": {
-        const { data: ticket, error } = await supabaseClient
-          .from("ticket_types")
+        const { data: upselling, error } = await supabaseClient
+          .from("upsellings")
           .select("*")
           .eq("id", id)
           .maybeSingle();
 
         if (error) throw error;
-        result = { data: ticket };
+        result = { data: upselling };
         break;
       }
 
       case "create": {
-        const { data: ticket, error } = await supabaseClient
-          .from("ticket_types")
+        const { data: upselling, error } = await supabaseClient
+          .from("upsellings")
           .insert(data)
           .select()
           .single();
 
         if (error) throw error;
-        result = { data: ticket };
+        result = { data: upselling };
         break;
       }
 
       case "update": {
-        const { data: ticket, error } = await supabaseClient
-          .from("ticket_types")
+        const { data: upselling, error } = await supabaseClient
+          .from("upsellings")
           .update({
             ...data,
             updated_at: new Date().toISOString(),
@@ -86,13 +86,13 @@ Deno.serve(async (req: Request) => {
           .single();
 
         if (error) throw error;
-        result = { data: ticket };
+        result = { data: upselling };
         break;
       }
 
       case "delete": {
         const { error } = await supabaseClient
-          .from("ticket_types")
+          .from("upsellings")
           .delete()
           .eq("id", id);
 
@@ -102,16 +102,16 @@ Deno.serve(async (req: Request) => {
       }
 
       case "checkAvailability": {
-        const { data: ticket, error } = await supabaseClient
-          .from("ticket_types")
+        const { data: upselling, error } = await supabaseClient
+          .from("upsellings")
           .select("quantity, sold")
-          .eq("id", ticketTypeId)
+          .eq("id", upsellingId)
           .maybeSingle();
 
         if (error) throw error;
-        if (!ticket) throw new Error("Ticket type not found");
+        if (!upselling) throw new Error("Upselling not found");
 
-        const available = ticket.quantity - ticket.sold;
+        const available = upselling.quantity - upselling.sold;
         result = {
           available,
           canPurchase: available >= quantity,

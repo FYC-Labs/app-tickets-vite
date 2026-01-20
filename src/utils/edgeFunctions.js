@@ -229,6 +229,33 @@ export const edgeFunctionHelpers = {
     }),
   },
 
+  upsellings: {
+    getByEventId: (eventId) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'getByEventId', eventId },
+    }),
+    getById: (id) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'getById', id },
+    }),
+    create: (data) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'create', data },
+    }),
+    update: (id, data) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'update', id, data },
+    }),
+    delete: (id) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'delete', id },
+    }),
+    checkAvailability: (upsellingId, quantity) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'checkAvailability', upsellingId, quantity },
+    }),
+  },
+
   orders: {
     getAll: (filters = {}) => callEdgeFunction('orders', {
       method: 'POST',

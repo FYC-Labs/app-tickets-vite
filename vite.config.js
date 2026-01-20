@@ -16,6 +16,14 @@ export default defineConfig({
     }),
     react(),
   ],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        quietDeps: true,
+        silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
+      },
+    },
+  },
   server: {
     port: 3000,
     open: true,

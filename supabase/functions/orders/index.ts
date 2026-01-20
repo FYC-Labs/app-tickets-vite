@@ -141,10 +141,12 @@ Deno.serve(async (req: Request) => {
               id,
               order_id,
               ticket_type_id,
+              upselling_id,
               quantity,
               unit_price,
               subtotal,
-              ticket_types(name)
+              ticket_types(name),
+              upsellings(name)
             ),
             discount_codes(code, type, value)
           `,
@@ -234,11 +236,11 @@ Deno.serve(async (req: Request) => {
           const orderItems = items.map((item: any) => ({
             order_id: newOrder.id,
             ticket_type_id: item.ticket_type_id,
+            upselling_id: item.upselling_id || null,
             quantity: item.quantity,
             unit_price: item.unit_price,
             subtotal: item.quantity * item.unit_price,
           }));
-
           const { error: itemsError } = await supabaseClient
             .from("order_items")
             .insert(orderItems);

@@ -35,9 +35,24 @@ export const loadOrderData = async (orderId) => {
       throw new Error(`This order cannot be processed. Status: ${orderData.status}`);
     }
 
-    // Validate order has required information
-    if (!orderData.total || orderData.total <= 0) {
-      throw new Error('Invalid order total. Please contact support.');
+    const orderTotal = parseFloat(orderData.total) || 0;
+    const isFreeOrder = orderTotal === 0;
+
+    if (isFreeOrder) {
+      try {
+        await ordersAPI.updateStatus(orderId, 'PAID');
+        const updatedOrderData = await ordersAPI.getById(orderId);
+        const formData = updatedOrderData.form_submissions?.forms || null;
+        $checkout.update({
+          order: updatedOrderData,
+          form: formData,
+          paymentStatus: 'completed',
+          error: null,
+        });
+        return;
+      } catch (updateError) {
+        console.error('Error auto-completing free order:', updateError);
+      }
     }
 
     if (!orderData.customer_email) {

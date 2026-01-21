@@ -278,7 +278,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
 
               {upsellings.length > 0 && (
               <div className="mb-32">
-                <h5 className="mb-24">Select Upsellings</h5>
+                <h5 className="mb-24">You might also like...</h5>
                 {upsellings.map((upselling) => {
                   const available = upselling.quantity - (upselling.sold || 0);
                   return (

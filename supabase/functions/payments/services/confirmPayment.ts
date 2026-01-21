@@ -476,6 +476,79 @@ async function handlePaymentFailure(
   throw new Error(`Payment verification failed: ${paymentError.message}`);
 }
 
+export async function confirmFreePayment(
+  orderId: string,
+  supabaseClient: any,
+  envTag: string,
+): Promise<ConfirmPaymentResult> {
+  try {
+    // Step 1: Get order details first to check for Slack webhook
+    const { data: order, error: orderError } = await supabaseClient
+      .from("orders")
+      .select("id, event_id, events(slack_webhook_url)")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (orderError) throw orderError;
+    if (!order) {
+      throw new Error(`Order ${orderId} not found`);
+    }
+
+    // Step 2: Update order status to PAID
+    await updateOrderStatus(
+      orderId,
+      "PAID",
+      null,
+      supabaseClient,
+    );
+
+    // Step 3: Update ticket inventory
+    const orderItems = await updateTicketInventory(orderId, supabaseClient);
+
+    // Step 4: Send Slack notification if webhook is configured
+    const slackWebhookUrl = order.events?.slack_webhook_url;
+    if (slackWebhookUrl) {
+      // Fetch full order data with event and order items for Slack notification
+      const { data: fullOrder } = await supabaseClient
+        .from("orders")
+        .select(
+          "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
+        )
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (fullOrder) {
+        sendSlackNotification(slackWebhookUrl, fullOrder).catch((error) => {
+          console.warn(
+            "Failed to send Slack notification on payment confirmation:",
+            error,
+          );
+        });
+      }
+    }
+
+    // Step 3: Send confirmation email
+    const triggerData = await sendConfirmationEmail(
+      orderId,
+      orderItems,
+      supabaseClient,
+    );
+
+    return {
+      data: {
+        status: "success",
+        orderId: orderId,
+        triggerData,
+      },
+    };
+  } catch (paymentError: any) {
+    await handlePaymentFailure(orderId, paymentError, supabaseClient);
+    // handlePaymentFailure throws, so this line won't be reached
+    // but TypeScript doesn't know that, so we need a return statement
+    throw paymentError;
+  }
+}
+
 /**
  * Main function to confirm payment and process order
  */

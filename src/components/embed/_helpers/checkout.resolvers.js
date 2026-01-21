@@ -40,7 +40,7 @@ export const loadOrderData = async (orderId) => {
 
     if (isFreeOrder) {
       try {
-        await ordersAPI.updateStatus(orderId, 'PAID');
+        await paymentsAPI.confirmFreePayment(orderId);
         const updatedOrderData = await ordersAPI.getById(orderId);
         const formData = updatedOrderData.form_submissions?.forms || null;
         $checkout.update({

@@ -4,7 +4,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { initializeSupabaseClient, initializeAccruPayClients, getEnvironment } from "./utils/clients.ts";
 import { createPaymentSession } from "./services/createPaymentSession.ts";
-import { confirmPayment } from "./services/confirmPayment.ts";
+import { confirmPayment, confirmFreePayment } from "./services/confirmPayment.ts";
 import { handleWebhook } from "./services/handleWebhook.ts";
 import { getPaymentSession } from "./services/getPaymentSession.ts";
 import { getProviders } from "./services/getProviders.ts";
@@ -47,6 +47,9 @@ Deno.serve(async (req) => {
       }
 
       case "confirmFreePayment": {
+        if (!orderId) {
+          throw new Error("orderId is required for confirmFreePayment action");
+        }
         result = await confirmFreePayment(orderId, supabaseClient, envTag);
         break;
       }

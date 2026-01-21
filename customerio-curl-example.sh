@@ -4,7 +4,7 @@
 # Based on supabase/functions/payments/services/customerio.ts
 
 # Replace these with your actual values
-APP_API_KEY="45b46d253c3cac13e30ccab424f13c15"
+APP_API_KEY="72f5626f6536c0390509040312913429"
 TEMPLATE_ID="2"
 CUSTOMER_EMAIL="ivan@fyclabs.com"
 CUSTOMER_NAME="Ivan"
@@ -46,5 +46,5 @@ curl -v https://api.customer.io/v1/send/email \
 #
 # echo "$request" | curl -v https://api.customer.io/v1/send/email \
 #   -H 'Content-Type: application/json' \
-#   -H 'Authorization: Bearer 45b46d253c3cac13e30ccab424f13c15' \
+#   -H 'Authorization: Bearer 72f5626f6536c0390509040312913429' \
 #   -d @-

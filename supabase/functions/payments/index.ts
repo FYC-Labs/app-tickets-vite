@@ -46,6 +46,11 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "confirmFreePayment": {
+        result = await confirmFreePayment(orderId, supabaseClient, envTag);
+        break;
+      }
+
       case "handleWebhook": {
         const signature = req.headers.get("x-accrupay-signature") || "";
         result = await handleWebhook(webhookData, signature, supabaseClient, accruPayClients, envTag);

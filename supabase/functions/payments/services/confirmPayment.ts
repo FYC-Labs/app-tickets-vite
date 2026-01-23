@@ -127,6 +127,40 @@ async function updateTicketInventory(orderId: string, supabaseClient: any) {
 }
 
 /**
+ * Updates discount code usage count after successful payment
+ */
+async function updateDiscountCodeUsage(orderId: string, supabaseClient: any) {
+  // Get discount_code_id from order
+  const { data: order, error: orderError } = await supabaseClient
+    .from("orders")
+    .select("discount_code_id")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderError) {
+    console.warn("Error fetching order for discount code update:", orderError);
+    return;
+  }
+
+  // If order has a discount code, increment its usage
+  if (order?.discount_code_id) {
+    const { error: discountError } = await supabaseClient.rpc(
+      "increment_discount_usage",
+      {
+        discount_id: order.discount_code_id,
+      },
+    );
+
+    if (discountError) {
+      console.warn(
+        "Error incrementing discount code usage:",
+        discountError,
+      );
+    }
+  }
+}
+
+/**
  * Fetches event and order data for email
  */
 async function getEventAndOrderData(orderId: string, supabaseClient: any) {
@@ -505,6 +539,9 @@ export async function confirmFreePayment(
     // Step 3: Update ticket inventory
     const orderItems = await updateTicketInventory(orderId, supabaseClient);
 
+    // Step 3.5: Update discount code usage if applicable
+    await updateDiscountCodeUsage(orderId, supabaseClient);
+
     // Step 4: Send Slack notification if webhook is configured
     const slackWebhookUrl = order.events?.slack_webhook_url;
     if (slackWebhookUrl) {
@@ -597,6 +634,9 @@ export async function confirmPayment(
 
     // Step 4: Update ticket inventory
     const orderItems = await updateTicketInventory(orderId, supabaseClient);
+
+    // Step 4.5: Update discount code usage if applicable
+    await updateDiscountCodeUsage(orderId, supabaseClient);
 
     // Step 5: Send Slack notification if webhook is configured
     const slackWebhookUrl = order.events?.slack_webhook_url;

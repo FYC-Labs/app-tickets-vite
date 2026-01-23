@@ -62,6 +62,19 @@ export async function handleWebhook(
               });
             }
           }
+
+          // Update discount code usage if applicable
+          const { data: order } = await supabaseClient
+            .from("orders")
+            .select("discount_code_id")
+            .eq("id", orderId)
+            .maybeSingle();
+
+          if (order?.discount_code_id) {
+            await supabaseClient.rpc("increment_discount_usage", {
+              discount_id: order.discount_code_id,
+            });
+          }
         }
       }
       break;

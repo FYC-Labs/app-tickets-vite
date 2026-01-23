@@ -332,6 +332,19 @@ Deno.serve(async (req: Request) => {
               });
             }
           }
+
+          // Update discount code usage if applicable
+          const { data: orderData } = await supabaseClient
+            .from("orders")
+            .select("discount_code_id")
+            .eq("id", id)
+            .maybeSingle();
+
+          if (orderData?.discount_code_id) {
+            await supabaseClient.rpc("increment_discount_usage", {
+              discount_id: orderData.discount_code_id,
+            });
+          }
         }
 
         // Sync order status to Customer.io whenever status changes

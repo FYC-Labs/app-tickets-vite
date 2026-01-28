@@ -37,10 +37,15 @@ export const loadFormData = async (formId, eventId) => {
         $embed.update({ tickets: filtered });
 
         const upsellingsData = await upsellingsAPI.getByEventId(formData.event_id);
-        let filteredUpsellings = upsellingsData || [];
+        let filteredUpsellings = (upsellingsData || []).filter(
+          (u) => u.upselling_strategy === 'PRE-CHECKOUT'
+        );
 
+        // Solo mostrar upsellings ligados al formulario (available_upselling_ids)
         if (formData.available_upselling_ids && formData.available_upselling_ids.length > 0) {
-          filteredUpsellings = filteredUpsellings.filter((u) => formData.available_upselling_ids.includes(u.id));
+          filteredUpsellings = filteredUpsellings.filter((u) =>
+            formData.available_upselling_ids.includes(u.id)
+          );
         }
 
         $embed.update({ upsellings: filteredUpsellings });
@@ -81,7 +86,7 @@ export const calculateTotals = () => {
     if (quantity > 0) {
       const upselling = upsellings.find((u) => u.id === upsellingId);
       if (upselling) {
-        subtotal += parseFloat(upselling.price) * quantity;
+        subtotal += parseFloat(upselling.amount ?? upselling.price) * quantity;
       }
     }
   });
@@ -150,14 +155,31 @@ export const handleApplyDiscount = async (formId, eventId) => {
 
 export const handleUpsellingChange = (upsellingId, quantity) => {
   const selectedUpsellings = { ...$embed.value.selectedUpsellings };
-  selectedUpsellings[upsellingId] = parseInt(quantity, 10) || 0;
-  $embed.update({ selectedUpsellings });
+  const newQuantity = parseInt(quantity, 10) || 0;
+  selectedUpsellings[upsellingId] = newQuantity;
+  
+  // Clear custom fields if quantity is 0
+  const upsellingCustomFields = { ...$embed.value.upsellingCustomFields };
+  if (newQuantity === 0) {
+    delete upsellingCustomFields[upsellingId];
+  }
+  
+  $embed.update({ selectedUpsellings, upsellingCustomFields });
   calculateTotals();
   checkFormValidity();
 };
 
+export const handleUpsellingCustomFieldChange = (upsellingId, fieldLabel, value) => {
+  const upsellingCustomFields = { ...$embed.value.upsellingCustomFields };
+  if (!upsellingCustomFields[upsellingId]) {
+    upsellingCustomFields[upsellingId] = {};
+  }
+  upsellingCustomFields[upsellingId][fieldLabel] = value;
+  $embed.update({ upsellingCustomFields });
+};
+
 export const validateForm = () => {
-  const { form, formData, selectedTickets, selectedUpsellings, tickets, upsellings } = $embed.value;
+  const { form, formData, selectedTickets, tickets } = $embed.value;
 
   if (form?.schema) {
     for (const field of form.schema) {
@@ -173,11 +195,6 @@ export const validateForm = () => {
   const hasTickets = Object.values(selectedTickets).some((qty) => qty > 0);
   if (tickets.length > 0 && !hasTickets) {
     return 'Please select at least one ticket';
-  }
-
-  const hasUpsellings = Object.values(selectedUpsellings).some((qty) => qty > 0);
-  if (upsellings.length > 0 && !hasUpsellings) {
-    return 'Please select at least one upselling';
   }
 
   if (!formData.email) {
@@ -225,6 +242,7 @@ export const checkFormValidity = () => {
       }
     }
   }
+  console.log('tickets', tickets);
 
   // Check if at least one ticket is selected (only if tickets are available)
   if (tickets.length > 0) {
@@ -275,14 +293,17 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
         });
 
       if (hasUpsellings) {
+        const { upsellingCustomFields } = $embed.value;
         const upsellingOrderItems = Object.entries(selectedUpsellings)
           .filter(([, quantity]) => quantity > 0)
           .map(([upsellingId, quantity]) => {
             const upselling = upsellings.find((u) => u.id === upsellingId);
+            const customFieldValues = upsellingCustomFields[upsellingId] || {};
             return {
               upselling_id: upsellingId,
               quantity,
-              unit_price: parseFloat(upselling.price),
+              unit_price: parseFloat(upselling.amount ?? upselling.price),
+              custom_fields: customFieldValues,
             };
           });
         orderItems.push(...upsellingOrderItems);

@@ -4,6 +4,8 @@ import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { Signal } from '@fyclabs/tools-fyc-react/signals';
 import ordersAPI from '@src/api/orders.api';
 import Loader from '@src/components/global/Loader';
+import PostCheckoutUpsellings from './_components/PostCheckoutUpsellings';
+import * as checkoutResolvers from './_helpers/checkout.resolvers';
 
 const $orderConfirmation = Signal({
   order: null,
@@ -27,8 +29,13 @@ function OrderConfirmation() {
       }
 
       $orderConfirmation.update({ order: orderData, error: null });
+
+      const eventId = orderData.event_id || orderData.events?.id;
+      const formData = orderData.form_submissions?.forms || null;
+      if (eventId) {
+        await checkoutResolvers.loadPostCheckoutUpsellings(eventId, formData);
+      }
     } catch (err) {
-      // Provide specific error messages
       let errorMessage = err.message || 'Unable to load order confirmation.';
 
       if (err.message.includes('Failed to fetch') || err.name === 'TypeError') {
@@ -105,11 +112,11 @@ function OrderConfirmation() {
           </div>
 
           <div className="mb-24">
-            <small className="text-muted">Tickets</small>
+            <small className="text-muted">Items</small>
             {order.order_items?.map((item, index) => (
               <div key={index} className="d-flex justify-content-between mt-8">
                 <span>
-                  {item.ticket_types?.name || 'Ticket'} x {item.quantity}
+                  {item.ticket_types?.name || item.upsellings?.item || item.upsellings?.name || 'Item'} x {item.quantity}
                 </span>
                 <span>${parseFloat(item.subtotal).toFixed(2)}</span>
               </div>
@@ -139,7 +146,7 @@ function OrderConfirmation() {
         </Card.Body>
       </Card>
 
-      <div className="d-flex gap-2">
+      <div className="d-flex gap-2 mb-24">
         <Button
           variant="outline-primary"
           onClick={() => window.print()}
@@ -148,6 +155,8 @@ function OrderConfirmation() {
           Print Receipt
         </Button>
       </div>
+
+      <PostCheckoutUpsellings order={order} />
     </Container>
   );
 }

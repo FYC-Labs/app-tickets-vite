@@ -25,6 +25,11 @@ export const paymentsAPI = {
     const result = await edgeFunctionHelpers.payments.getProviders();
     return result.data;
   },
+
+  async chargeUpsellings(orderId, items) {
+    const result = await edgeFunctionHelpers.payments.chargeUpsellings(orderId, items);
+    return result.data;
+  },
 };
 
 export default paymentsAPI;

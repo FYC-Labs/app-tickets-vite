@@ -53,6 +53,8 @@ export const loadForms = async (eventId) => {
 
 export const handleOpenModal = (form = null) => {
   if (form) {
+    // eslint-disable-next-line no-console
+    console.debug('[FormsManager] handleOpenModal form.available_upselling_ids =', form.available_upselling_ids);
     $formManagerForm.update({
       name: form.name,
       description: form.description || '',
@@ -116,12 +118,16 @@ export const handleTicketSelection = (ticketId) => {
 };
 
 export const handleUpsellingSelection = (upsellingId) => {
-  const currentIds = $formManagerForm.value.available_upselling_ids;
-  const isSelected = currentIds?.includes(upsellingId) || false;
+  const idStr = String(upsellingId);
+  const currentIds = ($formManagerForm.value.available_upselling_ids || []).map(String);
+  const isSelected = currentIds.includes(idStr);
 
   const newIds = isSelected
-    ? currentIds?.filter(id => id !== upsellingId) || []
-    : [...currentIds, upsellingId];
+    ? currentIds.filter((id) => id !== idStr)
+    : [...currentIds, idStr];
+
+  // eslint-disable-next-line no-console
+  console.debug('[FormsManager] toggle upselling', idStr, 'isSelected:', !isSelected, 'newIds:', newIds);
 
   $formManagerForm.value = {
     ...$formManagerForm.value,
@@ -265,6 +271,9 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       await formsAPI.create(submitData);
       showToast('Form created successfully', 'success');
     }
+
+    // Reload forms list so available_upselling_ids / available_ticket_ids are fresh in $forms
+    await loadForms(eventId);
 
     handleCloseModal();
     if (onUpdate) await onUpdate();

@@ -50,12 +50,12 @@ function UpsellingsManager({ eventId, upsellings, onUpdate }) {
                 {upsellings.map((upselling) => (
                   <tr key={upselling.id}>
                     <td>
-                      <strong>{upselling.name}</strong>
+                      <strong>{upselling.item ?? upselling.name}</strong>
                       {upselling.description && (
                         <div className="small text-muted">{upselling.description}</div>
                       )}
                     </td>
-                    <td>${parseFloat(upselling.price).toFixed(2)}</td>
+                    <td>${parseFloat(upselling.amount ?? upselling.price).toFixed(2)}</td>
                     <td>
                       {upselling.sold || 0} / {upselling.quantity}
                     </td>
@@ -104,6 +104,18 @@ function UpsellingsManager({ eventId, upsellings, onUpdate }) {
                 signal={$upsellingForm}
                 required
               />
+            </Form.Group>
+
+            <Form.Group className="mb-24">
+              <Form.Label>Upselling Strategy</Form.Label>
+              <UniversalInput
+                as="select"
+                name="upselling_strategy"
+                signal={$upsellingForm}
+              >
+                <option value="PRE-CHECKOUT">Pre-checkout</option>
+                <option value="POST-CHECKOUT">Post-checkout</option>
+              </UniversalInput>
             </Form.Group>
 
             <Form.Group className="mb-24">
@@ -216,7 +228,19 @@ function UpsellingsManager({ eventId, upsellings, onUpdate }) {
                               as="select"
                               name={`custom_field_type_${idx}`}
                               value={field.type}
-                              customOnChange={(e) => updateCustomField(idx, { type: e.target.value })}
+                              customOnChange={(e) => {
+                                const newType = e.target.value;
+                                const updateData = { type: newType };
+                                // If changing to select/radio, ensure options is an array
+                                if ((newType === 'select' || newType === 'radio') && !Array.isArray(field.options)) {
+                                  updateData.options = [];
+                                }
+                                // If changing away from select/radio, clear options
+                                if (newType !== 'select' && newType !== 'radio' && field.options) {
+                                  updateData.options = [];
+                                }
+                                updateCustomField(idx, updateData);
+                              }}
                             >
                               <option value="text">Text</option>
                               <option value="email">Email</option>
@@ -257,8 +281,36 @@ function UpsellingsManager({ eventId, upsellings, onUpdate }) {
                               <UniversalInput
                                 type="text"
                                 name={`custom_field_options_${idx}`}
-                                value={(field.options || []).join(', ')}
-                                customOnChange={(e) => updateCustomField(idx, { value: e.target.value })}
+                                value={(() => {
+                                  // Handle both array and string formats
+                                  if (Array.isArray(field.options)) {
+                                    return field.options.join(', ');
+                                  }
+                                  if (typeof field.options === 'string') {
+                                    return field.options;
+                                  }
+                                  return '';
+                                })()}
+                                customOnChange={(e) => {
+                                  const optionsString = e.target.value;
+                                  // Store as string while user is typing for better UX
+                                  updateCustomField(idx, {
+                                    options: optionsString,
+                                  });
+                                }}
+                                onBlur={(e) => {
+                                  // Parse to array when user finishes typing (on blur)
+                                  const optionsString = e.target.value;
+                                  if (optionsString.trim()) {
+                                    const optionsArray = optionsString
+                                      .split(',')
+                                      .map(opt => opt.trim())
+                                      .filter(opt => opt.length > 0);
+                                    updateCustomField(idx, { options: optionsArray });
+                                  } else {
+                                    updateCustomField(idx, { options: [] });
+                                  }
+                                }}
                                 placeholder="Small, Medium, Large"
                               />
                             </Form.Group>

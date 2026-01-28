@@ -1,4 +1,4 @@
-import { Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
+import { Card, Form, Button, Row, Col, Alert, Badge } from 'react-bootstrap';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import Loader from '@src/components/global/Loader';
@@ -9,6 +9,7 @@ import {
   handleFieldChange,
   handleTicketChange,
   handleUpsellingChange,
+  handleUpsellingCustomFieldChange,
   handleApplyDiscount,
   handleSubmit,
   updateDiscountCode,
@@ -18,11 +19,111 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
   const { form } = $embed.value;
   const { tickets, upsellings } = $embed.value;
   const { isLoading } = $embed.value;
-  const { error, formData, selectedTickets, selectedUpsellings, discountCode, appliedDiscount, totals, isFormValid } = $embed.value;
+  const { error, formData, selectedTickets, selectedUpsellings, upsellingCustomFields, discountCode, appliedDiscount, totals, isFormValid } = $embed.value;
 
   useEffectAsync(async () => {
     await loadFormData(formId, eventId);
   }, [formId, eventId]);
+
+  const renderUpsellingCustomField = (field, upsellingId, index) => {
+    const fieldKey = `${upsellingId}_${field.label}`;
+    const value = upsellingCustomFields[upsellingId]?.[field.label] || '';
+
+    switch (field.type) {
+      case 'textarea':
+        return (
+          <Form.Group key={index} className="mb-16">
+            <Form.Label className="small">
+              {field.label} {field.required && <span className="text-danger">*</span>}
+            </Form.Label>
+            <UniversalInput
+              as="textarea"
+              rows={2}
+              name={fieldKey}
+              placeholder={field.placeholder}
+              value={value}
+              customOnChange={(e) => handleUpsellingCustomFieldChange(upsellingId, field.label, e.target.value)}
+              required={field.required}
+            />
+          </Form.Group>
+        );
+
+      case 'select':
+        return (
+          <Form.Group key={index} className="mb-16">
+            <Form.Label className="small">
+              {field.label} {field.required && <span className="text-danger">*</span>}
+            </Form.Label>
+            <UniversalInput
+              as="select"
+              name={fieldKey}
+              value={value}
+              customOnChange={(e) => handleUpsellingCustomFieldChange(upsellingId, field.label, e.target.value)}
+              required={field.required}
+            >
+              <option value="">{field.placeholder || 'Select...'}</option>
+              {(field.options || []).map((option, i) => (
+                <option key={i} value={option}>
+                  {option}
+                </option>
+              ))}
+            </UniversalInput>
+          </Form.Group>
+        );
+
+      case 'checkbox':
+        return (
+          <Form.Group key={index} className="mb-16">
+            <UniversalInput
+              type="checkbox"
+              name={fieldKey}
+              label={field.label}
+              checked={!!value}
+              customOnChange={(e) => handleUpsellingCustomFieldChange(upsellingId, field.label, e.target.checked)}
+              required={field.required}
+            />
+          </Form.Group>
+        );
+
+      case 'radio':
+        return (
+          <Form.Group key={index} className="mb-16">
+            <Form.Label className="small">
+              {field.label} {field.required && <span className="text-danger">*</span>}
+            </Form.Label>
+            {(field.options || []).map((option, i) => (
+              <Form.Check
+                key={i}
+                type="radio"
+                label={option}
+                name={fieldKey}
+                value={option}
+                checked={value === option}
+                onChange={(e) => handleUpsellingCustomFieldChange(upsellingId, field.label, e.target.value)}
+                required={field.required}
+              />
+            ))}
+          </Form.Group>
+        );
+
+      default:
+        return (
+          <Form.Group key={index} className="mb-16">
+            <Form.Label className="small">
+              {field.label} {field.required && <span className="text-danger">*</span>}
+            </Form.Label>
+            <UniversalInput
+              type={field.type}
+              name={fieldKey}
+              placeholder={field.placeholder}
+              value={value}
+              customOnChange={(e) => handleUpsellingCustomFieldChange(upsellingId, field.label, e.target.value)}
+              required={field.required}
+            />
+          </Form.Group>
+        );
+    }
+  };
 
   const renderField = (field, index) => {
     const key = field.field_id_string !== null && field.field_id_string !== undefined ? field.field_id_string : field.label;
@@ -32,7 +133,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
       case 'textarea':
         return (
           <Form.Group key={index} className="mb-24">
-            <Form.Label>
+            <Form.Label >
               {field.label} {field.required && <span className="text-danger">*</span>}
             </Form.Label>
             <UniversalInput
@@ -51,7 +152,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
       case 'select':
         return (
           <Form.Group key={index} className="mb-24">
-            <Form.Label>
+            <Form.Label >
               {field.label} {field.required && <span className="text-danger">*</span>}
             </Form.Label>
             <UniversalInput
@@ -90,21 +191,23 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
       case 'radio':
         return (
           <Form.Group key={index} className="mb-24">
-            <Form.Label>
+            <Form.Label >
               {field.label} {field.required && <span className="text-danger">*</span>}
             </Form.Label>
-            {field.options?.map((option, i) => (
-              <Form.Check
-                key={i}
-                type="radio"
-                label={option}
-                name={field.label}
-                value={option}
-                checked={value === option}
-                onChange={(e) => handleFieldChange(field.label, e.target.value, field.field_id_string)}
-                required={field.required}
-              />
-            ))}
+            <div >
+              {field.options?.map((option, i) => (
+                <Form.Check
+                  key={i}
+                  type="radio"
+                  label={option}
+                  name={field.label}
+                  value={option}
+                  checked={value === option}
+                  onChange={(e) => handleFieldChange(field.label, e.target.value, field.field_id_string)}
+                  required={field.required}
+                />
+              ))}
+            </div>
             {field.instructions && <Form.Text className="text-muted">{field.instructions}</Form.Text>}
           </Form.Group>
         );
@@ -112,7 +215,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
       case 'tel':
         return (
           <Form.Group key={index} className="mb-24">
-            <Form.Label>
+            <Form.Label >
               {field.label} {field.required && <span className="text-danger">*</span>}
             </Form.Label>
             <UniversalInput
@@ -137,7 +240,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
       default:
         return (
           <Form.Group key={index} className="mb-24">
-            <Form.Label>
+            <Form.Label >
               {field.label} {field.required && <span className="text-danger">*</span>}
             </Form.Label>
             <UniversalInput
@@ -163,7 +266,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
   }
 
   return (
-    <Card className={`event-form-embed ${theme} border-0`}>
+    <Card className={`${theme} border-0`}>
       <Card.Body>
         {form && (
           <div className="mb-32">
@@ -174,9 +277,9 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
 
         {error && <Alert variant="danger">{error}</Alert>}
 
-        <Form onSubmit={(e) => handleSubmit(e, formId, eventId, onSubmitSuccess)}>
+        <Form onSubmit={(e) => handleSubmit(e, formId, eventId, onSubmitSuccess)} >
           <Form.Group className="mb-24">
-            <Form.Label>Email *</Form.Label>
+            <Form.Label >Email *</Form.Label>
             <UniversalInput
               type="email"
               name="email"
@@ -188,7 +291,7 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
           </Form.Group>
 
           <Form.Group className="mb-24">
-            <Form.Label>Name *</Form.Label>
+            <Form.Label >Name *</Form.Label>
             <UniversalInput
               type="text"
               name="name"
@@ -204,35 +307,54 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
           {tickets.length > 0 && (
             <div className="mb-32">
               <h5 className="mb-24">Select Tickets</h5>
-              {tickets.map((ticket) => {
+              {tickets.map((ticket, index) => {
                 const available = ticket.quantity - (ticket.sold || 0);
+                const selectedQty = selectedTickets[ticket.id] || 0;
+                const isSelected = selectedQty > 0;
                 return (
-                  <Card key={ticket.id} className="mb-24 border-0 shadow-none bg-transparent">
-                    <Card.Body>
+                  <Card key={ticket.id} className={`mb-16 border-0 ${isSelected ? 'selected' : ''} ${available === 0 ? 'sold-out' : ''}`} style={{ animationDelay: `${index * 0.1}s` }}>
+                    <Card.Body className="p-24">
                       <Row className="align-items-center">
                         <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
-                          <h6 className="mb-8">{ticket.name}</h6>
-                          {ticket.description && (
-                            <p className="text-muted small mb-0">{ticket.description}</p>
-                          )}
-                          {ticket.benefits && (
-                            <p className="text-muted small mb-0">{ticket.benefits}</p>
-                          )}
-                          <strong>
-                            ${parseFloat(ticket.price).toFixed(2)}
-                          </strong>
+                          <div className="d-flex align-items-start">
+                            <div className="me-16">
+                              <span className="icon-ticket">🎫</span>
+                            </div>
+                            <div className="flex-grow-1">
+                              <h6 className="mb-8">{ticket.name}</h6>
+                              {ticket.description && (
+                                <p className="text-muted small mb-8">{ticket.description}</p>
+                              )}
+                              {ticket.benefits && (
+                                <div className="mb-8">
+                                  <span className="benefits-label">Benefits:</span>
+                                  <span className="benefits-text">{ticket.benefits}</span>
+                                </div>
+                              )}
+                              <div>
+                                <span className="price-currency">$</span>
+                                <span className="price-amount">{parseFloat(ticket.price).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
                         </Col>
                         {form?.show_tickets_remaining !== false && (
-                          <Col md={3} className="text-muted small">
-                            {available > 0 ? `${available} available` : 'Sold out'}
+                          <Col md={3} className="text-center">
+                            {available > 0 ? (
+                              <Badge bg="success" >
+                                {available} available
+                              </Badge>
+                            ) : (
+                              <Badge bg="danger" >Sold out</Badge>
+                            )}
                           </Col>
                         )}
                         <Col md={3}>
-                          <Form.Label>Quantity</Form.Label>
+                          <Form.Label className="small fw-semibold mb-8">Quantity</Form.Label>
                           <UniversalInput
                             as="select"
                             name={`ticket_${ticket.id}`}
-                            value={selectedTickets[ticket.id] || 0}
+                            value={selectedQty}
                             customOnChange={e => handleTicketChange(ticket.id, Number(e.target.value))}
                             disabled={available === 0}
                           >
@@ -240,6 +362,14 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                               <option key={n} value={n}>{n}</option>
                             ))}
                           </UniversalInput>
+                          {selectedQty > 0 && (
+                            <div className="mt-8">
+                              <small className="text-muted">Subtotal: </small>
+                              <strong className="text-primary">
+                                ${(parseFloat(ticket.price) * selectedQty).toFixed(2)}
+                              </strong>
+                            </div>
+                          )}
                         </Col>
                       </Row>
                     </Card.Body>
@@ -276,57 +406,86 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                 </div>
               )}
 
-              {upsellings.length > 0 && (
+              {upsellings.filter(u => u.upselling_strategy === 'PRE-CHECKOUT').length > 0 && (
               <div className="mb-32">
                 <h5 className="mb-24">You might also like...</h5>
-                {upsellings.map((upselling) => {
-                  const available = upselling.quantity - (upselling.sold || 0);
-                  return (
-                    <Card key={upselling.id} className="mb-24 border-0 shadow-none bg-transparent">
-                      <Card.Body>
-                        <Row className="align-items-center">
-                          <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
-                            <h6 className="mb-8">{upselling.name}</h6>
-                            {upselling.description && (
-                            <p className="text-muted small mb-0">{upselling.description}</p>
-                            )}
-                            {upselling.benefits && (
-                            <p className="text-muted small mb-0">{upselling.benefits}</p>
-                            )}
-                            <strong>
-                              ${parseFloat(upselling.price).toFixed(2)}
-                            </strong>
-                          </Col>
-                          {/* {form?.show_tickets_remaining !== false && (
-                          <Col md={3} className="text-muted small">
-                            {available > 0 ? `${available} available` : 'Sold out'}
-                          </Col>
-                        )} */}
-                          <Col md={3}>
-                            <Form.Label>Quantity</Form.Label>
-                            <UniversalInput
-                              as="select"
-                              name={`upselling_${upselling.id}`}
-                              value={selectedUpsellings[upselling.id] || 0}
-                              customOnChange={e => handleUpsellingChange(upselling.id, Number(e.target.value))}
-                              disabled={available === 0}
-                            >
-                              {[...Array(available + 1).keys()].map(n => (
-                                <option key={n} value={n}>{n}</option>
-                              ))}
-                            </UniversalInput>
-                          </Col>
-                        </Row>
-                      </Card.Body>
-                    </Card>
-                  );
-                })}
+                {upsellings
+                  .filter(u => u.upselling_strategy === 'PRE-CHECKOUT')
+                  .map((upselling, index) => {
+                    const available = upselling.quantity - (upselling.sold || 0);
+                    const selectedQty = selectedUpsellings[upselling.id] || 0;
+                    const hasCustomFields = upselling.custom_fields && upselling.custom_fields.length > 0;
+                    const isSelected = selectedQty > 0;
+                    return (
+                      <Card key={upselling.id} className={`mb-16 border-0 ${isSelected ? 'selected' : ''} ${available === 0 ? 'sold-out' : ''}`} style={{ animationDelay: `${index * 0.1}s` }}>
+                        <Card.Body className="p-24">
+                          <Row className="align-items-center">
+                            <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
+                              <div className="d-flex align-items-start">
+                                <div className="me-16">
+                                  <span className="icon-sparkle">⭐</span>
+                                </div>
+                                <div className="flex-grow-1">
+                                  <h6 className="mb-8">{upselling.item ?? upselling.name}</h6>
+                                  {upselling.description && (
+                                  <p className="text-muted small mb-8">{upselling.description}</p>
+                                  )}
+                                  {upselling.benefits && (
+                                  <div className="mb-8">
+                                    <span className="benefits-label">Benefits:</span>
+                                    <span className="benefits-text">{upselling.benefits}</span>
+                                  </div>
+                                  )}
+                                  <div>
+                                    <span className="price-currency">$</span>
+                                    <span className="price-amount">{parseFloat(upselling.amount ?? upselling.price).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </Col>
+                            <Col md={3}>
+                              <Form.Label className="small fw-semibold mb-8">Quantity</Form.Label>
+                              <UniversalInput
+                                as="select"
+                                name={`upselling_${upselling.id}`}
+                                value={selectedQty}
+                                customOnChange={e => handleUpsellingChange(upselling.id, Number(e.target.value))}
+                                disabled={available === 0}
+                              >
+                                {[...Array(available + 1).keys()].map(n => (
+                                  <option key={n} value={n}>{n}</option>
+                                ))}
+                              </UniversalInput>
+                              {selectedQty > 0 && (
+                                <div className="mt-8">
+                                  <small className="text-muted">Subtotal: </small>
+                                  <strong className="text-primary">
+                                    ${(parseFloat(upselling.amount ?? upselling.price) * selectedQty).toFixed(2)}
+                                  </strong>
+                                </div>
+                              )}
+                            </Col>
+                          </Row>
+                          {selectedQty > 0 && hasCustomFields && (
+                            <Row className="mt-16">
+                              <Col md={12}>
+                                <div className="border-top pt-16 mt-16">
+                                  <h6 className="small mb-16 fw-semibold">Additional Information</h6>
+                                  {upselling.custom_fields.map((field, idx) => renderUpsellingCustomField(field, upselling.id, idx))}
+                                </div>
+                              </Col>
+                            </Row>
+                          )}
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
               </div>
               )}
 
               {totals.subtotal > 0 && (
-                <Card className="bg-transparent">
-                  <Card.Body>
+                <Card className="bg-transparent border-0">
+                  <Card.Body className="p-24">
                     <div className="d-flex justify-content-between mb-16">
                       <span>Subtotal:</span>
                       <strong>${totals.subtotal.toFixed(2)}</strong>
@@ -337,9 +496,9 @@ function EventForm({ formId, eventId, onSubmitSuccess, theme = 'light' }) {
                         <strong>-${totals.discount_amount.toFixed(2)}</strong>
                       </div>
                     )}
-                    <div className="d-flex justify-content-between pt-2 border-top">
+                    <div className="d-flex justify-content-between pt-16 border-top">
                       <strong>Total:</strong>
-                      <strong className="text-primary">${totals.total.toFixed(2)}</strong>
+                      <strong>${totals.total.toFixed(2)}</strong>
                     </div>
                   </Card.Body>
                 </Card>

@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
               unit_price,
               subtotal,
               ticket_types(name),
-              upsellings(name)
+              upsellings(item)
             ),
             discount_codes(code, type, value)
           `,
@@ -235,11 +235,12 @@ Deno.serve(async (req: Request) => {
         if (items && items.length > 0) {
           const orderItems = items.map((item: any) => ({
             order_id: newOrder.id,
-            ticket_type_id: item.ticket_type_id,
+            ticket_type_id: item.ticket_type_id ?? null,
             upselling_id: item.upselling_id || null,
             quantity: item.quantity,
             unit_price: item.unit_price,
             subtotal: item.quantity * item.unit_price,
+            custom_fields: item.custom_fields ?? {},
           }));
           const { error: itemsError } = await supabaseClient
             .from("order_items")
@@ -427,6 +428,96 @@ Deno.serve(async (req: Request) => {
           discount_amount: parseFloat(discountAmount.toFixed(2)),
           total: parseFloat(total.toFixed(2)),
         };
+        break;
+      }
+
+      case "addItemsToOrder": {
+        // First check if order exists and is PAID
+        const { data: order, error: fetchError } = await supabaseClient
+          .from("orders")
+          .select("id, status, subtotal, discount_amount, total, event_id")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!order) {
+          throw new Error("Order not found");
+        }
+
+        if (order.status !== "PAID") {
+          throw new Error("Can only add items to paid orders");
+        }
+
+        if (!items || items.length === 0) {
+          throw new Error("No items provided");
+        }
+
+        // Calculate new items subtotal
+        let newItemsSubtotal = 0;
+        const orderItems = items.map((item: any) => {
+          const itemSubtotal = item.quantity * item.unit_price;
+          newItemsSubtotal += itemSubtotal;
+          return {
+            order_id: id,
+            ticket_type_id: item.ticket_type_id || null,
+            upselling_id: item.upselling_id || null,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: itemSubtotal,
+            custom_fields: item.custom_fields ?? {},
+          };
+        });
+
+        // Insert new order items
+        const { error: itemsError } = await supabaseClient
+          .from("order_items")
+          .insert(orderItems);
+
+        if (itemsError) throw itemsError;
+
+        // Update order totals
+        const newSubtotal = parseFloat(order.subtotal) + newItemsSubtotal;
+        // Apply existing discount to new total (if any)
+        const newTotal = Math.max(0, newSubtotal - parseFloat(order.discount_amount || 0));
+
+        const { data: updatedOrder, error: updateError } = await supabaseClient
+          .from("orders")
+          .update({
+            subtotal: newSubtotal.toFixed(2),
+            total: newTotal.toFixed(2),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select(
+            "*, events(title), order_items(*, ticket_types(name), upsellings(item)), discount_codes(code, type, value)",
+          )
+          .single();
+
+        if (updateError) throw updateError;
+
+        // Update inventory for upsellings if they have quantity tracking
+        for (const item of items) {
+          if (item.upselling_id) {
+            // Check if upselling has quantity tracking
+            const { data: upselling } = await supabaseClient
+              .from("upsellings")
+              .select("quantity, sold")
+              .eq("id", item.upselling_id)
+              .maybeSingle();
+
+            if (upselling && upselling.quantity !== null) {
+              await supabaseClient
+                .from("upsellings")
+                .update({
+                  sold: (upselling.sold || 0) + item.quantity,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", item.upselling_id);
+            }
+          }
+        }
+
+        result = { data: updatedOrder };
         break;
       }
 

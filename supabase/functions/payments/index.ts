@@ -8,6 +8,7 @@ import { confirmPayment } from "./services/confirmPayment.ts";
 import { handleWebhook } from "./services/handleWebhook.ts";
 import { getPaymentSession } from "./services/getPaymentSession.ts";
 import { getProviders } from "./services/getProviders.ts";
+import { chargeUpsellingsWithStoredMethod } from "./services/chargeUpsellings.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     const envTag = getEnvironment();
 
     // Parse request body
-    const { action, orderId, paymentData, webhookData } = await req.json();
+    const { action, orderId, paymentData, webhookData, items } = await req.json();
 
     let result;
 
@@ -43,6 +44,17 @@ Deno.serve(async (req) => {
 
       case "confirmPayment": {
         result = await confirmPayment(orderId, supabaseClient, accruPayClients, envTag);
+        break;
+      }
+
+      case "chargeUpsellings": {
+        result = await chargeUpsellingsWithStoredMethod(
+          orderId,
+          items,
+          supabaseClient,
+          accruPayClients,
+          envTag,
+        );
         break;
       }
 

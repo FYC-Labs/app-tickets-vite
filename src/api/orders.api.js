@@ -37,6 +37,11 @@ export const ordersAPI = {
     return result;
   },
 
+  async addItemsToOrder(orderId, items) {
+    const result = await edgeFunctionHelpers.orders.addItemsToOrder(orderId, items);
+    return result.data;
+  },
+
   async delete(id) {
     const result = await edgeFunctionHelpers.orders.delete(id);
     return result.data;

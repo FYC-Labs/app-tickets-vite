@@ -24,7 +24,7 @@ function OrderSummary({ order }) {
           {order.order_items?.map((item, index) => (
             <div key={index} className="d-flex justify-content-between mt-8">
               <span>
-                {item.upsellings ? item.upsellings?.name : item.ticket_types?.name || 'Ticket'} x {item.quantity}
+                {item.upsellings ? (item.upsellings?.item ?? item.upsellings?.name) : item.ticket_types?.name || 'Ticket'} x {item.quantity}
               </span>
               <span>${parseFloat(item.subtotal).toFixed(2)}</span>
             </div>

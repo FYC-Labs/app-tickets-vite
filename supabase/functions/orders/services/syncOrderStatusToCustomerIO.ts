@@ -46,7 +46,7 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
         unit_price,
         subtotal,
         ticket_types(name),
-        upsellings(name)
+        upsellings(item)
       )
     `,
     )
@@ -106,7 +106,7 @@ function buildCustomerAttributes(orderData: any) {
   // Build order items array with details
   const orderItemsArr = (orderData.order_items || []).map((item: any) => ({
     ticketTypeName: item.ticket_types?.name || "",
-    upsellingName: item.upsellings?.name || "",
+    upsellingName: item.upsellings?.item || item.upsellings?.name || "",
     upsellingId: item.upsellings?.id || "",
     quantity: item.quantity,
     unitPrice: item.unit_price,

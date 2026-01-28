@@ -1,7 +1,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { TRANSACTION_PROVIDER, CURRENCY, COUNTRY_ISO_2 } from "npm:@accrupay/node@0.14.0";
+import { TRANSACTION_PROVIDER, CURRENCY, COUNTRY_ISO_2 } from "npm:@accrupay/node@0.15.1";
 import type { PaymentSessionResult } from "../types/index.ts";
 
 /**
@@ -84,11 +84,16 @@ export async function createPaymentSession(
   const accruPay = selectAccruPayClient(
     accruPayClients,
     order.events?.accrupay_environment || null,
-    envTag
+    envTag,
   );
 
   const selectedEnv = order.events?.accrupay_environment || "default";
-  console.log(`Using AccruPay environment: ${selectedEnv} (ENV_TAG: ${envTag})`);
+  console.log(
+    "[ACCRUPAY][createPaymentSession] Using environment:",
+    selectedEnv,
+    "ENV_TAG:",
+    envTag,
+  );
 
 
   if (order.status !== "PENDING") {
@@ -99,6 +104,13 @@ export async function createPaymentSession(
   try {
     // Convert amount to bigint (cents)
     const amountInCents = Math.round(parseFloat(order.total) * 100);
+
+    console.log("[ACCRUPAY][createPaymentSession] Creating client session", {
+      orderId,
+      status: order.status,
+      amountInCents,
+      customerEmail: order.customer_email,
+    });
 
     const sessionData = {
       transactionProvider: TRANSACTION_PROVIDER.NUVEI,
@@ -117,27 +129,53 @@ export async function createPaymentSession(
           billingAddressLine2: order.billing_address_2 || null,
           billingAddressPostalCode: order.billing_zip || "00000",
         },
-        storePaymentMethod: false,
+        storePaymentMethod: true,
         merchantInternalCustomerCode: order.customer_email,
         merchantInternalTransactionCode: order.id,
       },
     };
 
-    const transaction = await accruPay.transactions.startClientPaymentSession(sessionData);
+    console.log(
+      "[ACCRUPAY][createPaymentSession] Session data payload:",
+      JSON.stringify(sessionData, null, 2),
+    );
 
-    // Get pre-session data for React SDK
+    // @accrupay/node 0.15+: clientSessions.payments.start (was startClientPaymentSession)
+    const session = await accruPay.transactions.clientSessions.payments.start(
+      sessionData,
+    );
+    const transaction = session?.transaction ?? session;
+    console.log(
+      "[ACCRUPAY][createPaymentSession] Client payment session created:",
+      {
+        transactionId: transaction?.id ?? session?.id,
+        token: transaction?.token ?? session?.token,
+        status: transaction?.status ?? session?.status,
+      },
+    );
+
+    // Pre-session config for React SDK (npm docs: clientSessions.getBaseConfig)
+    // Output: { provider: 'NUVEI', data: { merchantId, environment, ... } }
     let preSessionData = null;
     try {
-      const preSessionDataResponse = await accruPay.transactions.getClientPaymentPreSessionData({
+      const config = await accruPay.transactions.clientSessions.getBaseConfig({
         transactionProvider: TRANSACTION_PROVIDER.NUVEI,
       });
       preSessionData = {
-        ...preSessionDataResponse,
-        env: preSessionDataResponse.environment,
+        provider: config.provider,
+        ...config.data,
+        environment: config.data?.environment ?? config.data?.env,
+        env: config.data?.environment ?? config.data?.env,
       };
-    } catch (preSessionError) {
-      console.warn("Could not fetch pre-session data:", preSessionError);
-      // Continue without pre-session data - session token should be sufficient
+      console.log(
+        "[ACCRUPAY][createPaymentSession] Base config loaded:",
+        preSessionData.env ?? preSessionData.environment,
+      );
+    } catch (configError) {
+      console.warn(
+        "[ACCRUPAY][createPaymentSession] Could not fetch getBaseConfig:",
+        configError,
+      );
     }
 
     // Store session information in order

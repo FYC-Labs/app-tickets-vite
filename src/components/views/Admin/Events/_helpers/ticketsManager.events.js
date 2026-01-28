@@ -43,6 +43,26 @@ export const handleOpenModal = (ticket = null) => {
   }
 };
 
+/** Loads ticket into form for inline editing (e.g. in FormEditModal Tickets tab). Does NOT set showModal. */
+export const loadTicketFormForInline = (ticket = null) => {
+  if (ticket) {
+    $ticketUI.update({ editingTicket: ticket });
+    $ticketForm.update({
+      name: ticket.name,
+      description: ticket.description || '',
+      benefits: ticket.benefits || '',
+      price: ticket.price,
+      quantity: ticket.quantity,
+      sales_start: new Date(ticket.sales_start).toISOString().slice(0, 16),
+      sales_end: new Date(ticket.sales_end).toISOString().slice(0, 16),
+      custom_fields: Array.isArray(ticket.custom_fields) ? ticket.custom_fields : [],
+    });
+  } else {
+    $ticketUI.update({ editingTicket: null });
+    $ticketForm.reset();
+  }
+};
+
 export const handleCloseModal = () => {
   $ticketUI.update({
     showModal: false,

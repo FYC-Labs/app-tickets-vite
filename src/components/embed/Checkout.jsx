@@ -11,6 +11,7 @@ import CreditCardForm from './_components/CreditCardForm';
 import OrderSummary from './_components/OrderSummary';
 import PaymentStatus from './_components/PaymentStatus';
 import TestCards from './_components/TestCards';
+import PostCheckoutUpsellings from './_components/PostCheckoutUpsellings';
 
 const PAYMENT_PROCESSOR = 'nuvei';
 
@@ -49,6 +50,13 @@ function Checkout() {
   }, [orderId]);
 
   useEffectAsync(async () => {
+    const { order: orderData, form: formData } = $checkout.value;
+    if (orderData && orderData.status === 'PAID' && orderData.event_id) {
+      await resolvers.loadPostCheckoutUpsellings(orderData.event_id, formData ?? null);
+    }
+  }, [order]);
+
+  useEffectAsync(async () => {
     const { order: orderData, paymentSession: currentSession } = $checkout.value;
     if (orderData && orderData.status === 'PENDING' && !currentSession) {
       try {
@@ -85,11 +93,12 @@ function Checkout() {
   if (order?.status === 'PAID') {
     return (
       <Container className={`py-5 ${theme}`} style={{ maxWidth: '800px' }}>
-        <Alert variant="info">
-          <Alert.Heading>Order Already Paid</Alert.Heading>
-          <p>This order has already been paid.</p>
+        <Alert variant="success">
+          <Alert.Heading>Order Confirmed</Alert.Heading>
+          <p>Your order has been successfully paid. Thank you for your purchase!</p>
         </Alert>
         <OrderSummary order={order} />
+        <PostCheckoutUpsellings order={order} />
       </Container>
     );
   }

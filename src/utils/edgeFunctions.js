@@ -277,6 +277,10 @@ export const edgeFunctionHelpers = {
       method: 'POST',
       body: { action: 'calculateTotal', items, discountCodeId },
     }),
+    addItemsToOrder: (id, items) => callEdgeFunction('orders', {
+      method: 'POST',
+      body: { action: 'addItemsToOrder', id, items },
+    }),
     delete: (id) => callEdgeFunction('orders', {
       method: 'POST',
       body: { action: 'delete', id },
@@ -373,6 +377,10 @@ export const edgeFunctionHelpers = {
     getProviders: () => callEdgeFunction('payments', {
       method: 'POST',
       body: { action: 'getProviders' },
+    }),
+    chargeUpsellings: (orderId, items) => callEdgeFunction('payments', {
+      method: 'POST',
+      body: { action: 'chargeUpsellings', orderId, items },
     }),
   },
 };

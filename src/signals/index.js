@@ -45,6 +45,7 @@ export const $embed = Signal({
   formData: {},
   selectedTickets: {},
   selectedUpsellings: {},
+  upsellingCustomFields: {}, // { [upsellingId]: { [fieldLabel]: value } }
   discountCode: '',
   appliedDiscount: null,
   totals: { subtotal: 0, discount_amount: 0, total: 0 },

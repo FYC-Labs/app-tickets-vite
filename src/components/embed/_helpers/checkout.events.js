@@ -1,6 +1,7 @@
 import { $checkout } from '@src/signals';
 import paymentsAPI from '@src/api/payments.api';
-import { isProcessingPayment, showTestCards } from './checkout.consts';
+import { isProcessingPayment, showTestCards, selectedPostCheckoutUpsellings, postCheckoutUpsellingCustomFields, isAddingUpsellings, postCheckoutUpsellings } from './checkout.consts';
+import * as resolvers from './checkout.resolvers';
 
 // Build URL with order details as query parameters
 const buildConfirmationUrl = (baseUrl, order) => {
@@ -53,17 +54,19 @@ export const handlePaymentSuccess = async (paymentData) => {
     // Only proceed with redirect logic if confirmPayment succeeded
     let redirectUrl;
 
-    console.log('confirmationUrlOverride', confirmationUrlOverride);
-    console.log('form.order_confirmation_url', form?.order_confirmation_url);
+    const hasConfirmationUrlOverride = confirmationUrlOverride &&
+      typeof confirmationUrlOverride === 'string' &&
+      confirmationUrlOverride.trim() !== '';
 
-    if (confirmationUrlOverride) {
-      // Use query parameter override
+    const hasFormUrl = form?.order_confirmation_url &&
+      typeof form.order_confirmation_url === 'string' &&
+      form.order_confirmation_url.trim() !== '';
+
+    if (hasConfirmationUrlOverride) {
       redirectUrl = buildConfirmationUrl(confirmationUrlOverride, order);
-    } else if (form?.order_confirmation_url) {
-      // Use form's configured URL
+    } else if (hasFormUrl) {
       redirectUrl = buildConfirmationUrl(form.order_confirmation_url, order);
     } else {
-      // Default fallback
       redirectUrl = `/embed/order-confirmation/${order.id}`;
     }
 
@@ -88,8 +91,10 @@ export const handlePaymentSuccess = async (paymentData) => {
       })) || [],
     };
 
-    // Emit postMessage event to parent window if in iframe
-    if (window.parent && window.parent !== window) {
+    const isInIframe = window.parent && window.parent !== window;
+
+    if (isInIframe) {
+      console.log('Sending postMessage to parent window');
       window.parent.postMessage({
         type: 'order-complete',
         redirectUrl,
@@ -98,22 +103,13 @@ export const handlePaymentSuccess = async (paymentData) => {
       }, '*'); // In production, you might want to specify the origin
     }
 
-    if (isEmbedded) {
-      // When embedded, don't update UI - just let parent handle redirect
-      // Keep the processing state so iframe doesn't show success screen
-      return;
-    }
-
-    // Standalone mode - show success message and redirect
-    // Only update to completed status after successful confirmation
     $checkout.update({
       paymentStatus: 'completed',
     });
 
-    // Only redirect after payment was successfully confirmed
     setTimeout(() => {
       window.location.href = redirectUrl;
-    }, 2000);
+    }, isEmbedded ? 1000 : 2000);
   } catch (err) {
     // Payment confirmation failed - show clear error message
     const errorMessage = err.message || 'Payment confirmation failed. Please contact support if you were charged.';
@@ -147,4 +143,74 @@ export const handlePaymentCancel = () => {
 
 export const toggleTestCards = () => {
   showTestCards.value = !showTestCards.value;
+};
+
+export const handlePostCheckoutUpsellingChange = (upsellingId, quantity) => {
+  const selected = { ...selectedPostCheckoutUpsellings.value };
+  const customFields = { ...postCheckoutUpsellingCustomFields.value };
+  const qty = parseInt(quantity, 10) || 0;
+  if (qty > 0) {
+    selected[upsellingId] = qty;
+  } else {
+    delete selected[upsellingId];
+    delete customFields[upsellingId];
+  }
+  selectedPostCheckoutUpsellings.value = selected;
+  postCheckoutUpsellingCustomFields.value = customFields;
+};
+
+export const handlePostCheckoutUpsellingCustomFieldChange = (upsellingId, fieldLabel, value) => {
+  const customFields = { ...postCheckoutUpsellingCustomFields.value };
+  if (!customFields[upsellingId]) {
+    customFields[upsellingId] = {};
+  }
+  customFields[upsellingId][fieldLabel] = value;
+  postCheckoutUpsellingCustomFields.value = customFields;
+};
+
+export const handleAddUpsellingsToOrder = async (orderId) => {
+  try {
+    isAddingUpsellings.value = true;
+    $checkout.update({ error: null });
+
+    const selected = selectedPostCheckoutUpsellings.value;
+    const upsellings = postCheckoutUpsellings.value;
+    const customFields = postCheckoutUpsellingCustomFields.value;
+
+    const items = Object.entries(selected)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([upsellingId, quantity]) => {
+        const upselling = upsellings.find((u) => u.id === upsellingId);
+        if (!upselling) {
+          throw new Error(`Upselling ${upsellingId} not found`);
+        }
+        const customFieldValues = customFields[upsellingId] || {};
+        return {
+          upselling_id: upsellingId,
+          quantity,
+          unit_price: parseFloat(upselling.amount ?? upselling.price),
+          custom_fields: customFieldValues,
+        };
+      });
+
+    if (items.length === 0) {
+      throw new Error('Please select at least one item to add');
+    }
+
+    // Charge upsellings using stored payment method and append items to order
+    const updatedOrder = await paymentsAPI.chargeUpsellings(orderId, items);
+
+    $checkout.update({ order: updatedOrder });
+
+    selectedPostCheckoutUpsellings.value = {};
+    postCheckoutUpsellingCustomFields.value = {};
+
+    return updatedOrder;
+  } catch (err) {
+    const errorMessage = err.message || 'Failed to add items to order. Please try again.';
+    $checkout.update({ error: errorMessage });
+    throw err;
+  } finally {
+    isAddingUpsellings.value = false;
+  }
 };

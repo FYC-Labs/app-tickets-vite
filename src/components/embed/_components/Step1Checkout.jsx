@@ -46,12 +46,17 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
         return;
       }
 
-      const session = await paymentsAPI.createPaymentSession(order.id);
-      if (!session || !session.sessionToken) {
-        setLocalError('Payment session could not be initialized. Please try again.');
-        return;
+      const orderTotal = parseFloat(order.total);
+      if (orderTotal > 0) {
+        const session = await paymentsAPI.createPaymentSession(order.id);
+        if (!session || !session.sessionToken) {
+          setLocalError('Payment session could not be initialized. Please try again.');
+          return;
+        }
+        $embed.update({ paymentSession: session });
+      } else {
+        $embed.update({ paymentSession: null });
       }
-      $embed.update({ paymentSession: session });
 
       if (onPlaceOrder) {
         onPlaceOrder();

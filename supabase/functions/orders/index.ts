@@ -336,6 +336,19 @@ Deno.serve(async (req: Request) => {
               });
             }
           }
+
+          // Update discount code usage if applicable
+          const { data: orderData } = await supabaseClient
+            .from("orders")
+            .select("discount_code_id")
+            .eq("id", id)
+            .maybeSingle();
+
+          if (orderData?.discount_code_id) {
+            await supabaseClient.rpc("increment_discount_usage", {
+              discount_id: orderData.discount_code_id,
+            });
+          }
         }
 
         // Sync order status to Customer.io whenever status changes
@@ -571,7 +584,7 @@ Deno.serve(async (req: Request) => {
           // Cliente eliminó todos los upsellings: solo tickets, descuento = solo código (sin descuento de upsellings)
           newSubtotal = baseSubtotal;
           newDiscountAmount = 0;
-          if (order.discount_code_id) {
+          if (order.discount_code_id && baseSubtotal > 0) {
             const { data: discountCode } = await supabaseClient
               .from("discount_codes")
               .select("type, value")
@@ -581,7 +594,8 @@ Deno.serve(async (req: Request) => {
               if (discountCode.type === "PERCENT") {
                 newDiscountAmount = (baseSubtotal * parseFloat(discountCode.value)) / 100;
               } else {
-                newDiscountAmount = parseFloat(discountCode.value);
+                const fixedDiscount = parseFloat(discountCode.value);
+                newDiscountAmount = Math.min(fixedDiscount, baseSubtotal);
               }
             }
           }
@@ -609,8 +623,9 @@ Deno.serve(async (req: Request) => {
           if (itemsError) throw itemsError;
 
           newSubtotal = baseSubtotal + newUpsellingsSubtotal;
+          // Discount code applies only to tickets (baseSubtotal), not to upsellings
           let discountFromCode = 0;
-          if (order.discount_code_id) {
+          if (order.discount_code_id && baseSubtotal > 0) {
             const { data: dc } = await supabaseClient
               .from("discount_codes")
               .select("type, value")
@@ -618,13 +633,17 @@ Deno.serve(async (req: Request) => {
               .maybeSingle();
             if (dc) {
               if (dc.type === "PERCENT") {
-                discountFromCode = (newSubtotal * parseFloat(dc.value)) / 100;
+                discountFromCode = (baseSubtotal * parseFloat(dc.value)) / 100;
               } else {
-                discountFromCode = parseFloat(dc.value);
+                const fixedDiscount = parseFloat(dc.value);
+                discountFromCode = Math.min(fixedDiscount, baseSubtotal);
               }
             }
           }
-          const additionalUpsellingDiscount = parseFloat(upsellingDiscountAmount ?? 0) || 0;
+          // When a discount code is on the order, do not apply upselling discount rules
+          const additionalUpsellingDiscount = order.discount_code_id
+            ? 0
+            : parseFloat(upsellingDiscountAmount ?? 0) || 0;
           newDiscountAmount = discountFromCode + additionalUpsellingDiscount;
         }
 

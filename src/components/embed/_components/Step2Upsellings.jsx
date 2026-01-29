@@ -8,12 +8,14 @@ import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import ordersAPI from '@src/api/orders.api';
+import paymentsAPI from '@src/api/payments.api';
 import CreditCardForm from './CreditCardForm';
 import OrderSummary from './OrderSummary';
 import {
   handleUpsellingChange,
   handleUpsellingCustomFieldChange,
   handlePaymentSuccess,
+  handleFreeOrderComplete,
   getUpsellingDiscountAmount,
 } from '../_helpers/eventForm.events';
 
@@ -24,7 +26,11 @@ function Step2Upsellings({ onGoBack }) {
 
   const totalTicketsSelected = Object.values(selectedTickets || {}).reduce((sum, qty) => sum + (qty || 0), 0);
 
+  const orderTotal = order != null ? parseFloat(order.total) : null;
+  const isFreeOrder = orderTotal !== null && orderTotal <= 0;
+
   const [paymentError, setPaymentError] = useState(null);
+  const [isCompletingFree, setIsCompletingFree] = useState(false);
 
   const confirmationUrlOverride = searchParams.get('confirmationUrl');
 
@@ -59,6 +65,22 @@ function Step2Upsellings({ onGoBack }) {
       $embed.update({ selectedUpsellings: updatedSelectedUpsellings });
     }
   }, [ticketsKey]);
+
+  // When order total becomes > 0 (e.g. user added upsellings) and we have no session yet, create one
+  useEffectAsync(async () => {
+    const { order: currentOrder, paymentSession: currentSession } = $embed.value;
+    if (!currentOrder || currentOrder.status === 'PAID') return;
+    if (parseFloat(currentOrder.total) <= 0) return;
+    if (currentSession?.sessionToken) return;
+    try {
+      const session = await paymentsAPI.createPaymentSession(currentOrder.id);
+      if (session?.sessionToken) {
+        $embed.update({ paymentSession: session });
+      }
+    } catch {
+      // Session creation can fail; paymentError will show when user tries to pay
+    }
+  }, [order?.id, order?.total]);
 
   const upsellingsKey = JSON.stringify($embed.value.selectedUpsellings || {});
   const customFieldsKey = JSON.stringify($embed.value.upsellingCustomFields || {});
@@ -276,7 +298,36 @@ function Step2Upsellings({ onGoBack }) {
           </Alert>
         )}
 
-        {order && providers && paymentSession && (
+        {order && isFreeOrder && (
+          <Card>
+            <Card.Body>
+              <p className="text-muted mb-16">
+                Your order total is $0. No payment required.
+              </p>
+              <Button
+                variant="dark"
+                size="lg"
+                className="w-100"
+                disabled={isCompletingFree}
+                onClick={async () => {
+                  try {
+                    setIsCompletingFree(true);
+                    setPaymentError(null);
+                    await handleFreeOrderComplete(confirmationUrlOverride);
+                  } catch (err) {
+                    setPaymentError(err.message || 'Unable to complete order. Please try again.');
+                  } finally {
+                    setIsCompletingFree(false);
+                  }
+                }}
+              >
+                {isCompletingFree ? 'Completing...' : 'Complete order'}
+              </Button>
+            </Card.Body>
+          </Card>
+        )}
+
+        {order && !isFreeOrder && providers && paymentSession && (
           <Card>
             <Card.Body>
               <AccruPay

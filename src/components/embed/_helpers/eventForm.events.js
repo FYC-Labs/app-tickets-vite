@@ -66,7 +66,12 @@ export const loadFormData = async (formId, eventId) => {
 };
 
 export const getUpsellingDiscountAmount = () => {
-  const { selectedTickets, selectedUpsellings, tickets, upsellings } = $embed.value;
+  const { selectedTickets, selectedUpsellings, tickets, upsellings, appliedDiscount } = $embed.value;
+
+  // When a discount code is applied to tickets, do not apply upselling discount rules
+  if (appliedDiscount) {
+    return 0;
+  }
 
   let ticketsSubtotal = 0;
   Object.entries(selectedTickets || {}).forEach(([ticketId, quantity]) => {
@@ -133,12 +138,14 @@ export const calculateTotals = () => {
   const upsellingDiscountAmount = getUpsellingDiscountAmount();
 
   const totalSubtotal = ticketsSubtotal + upsellingsSubtotal;
+  // Discount code applies only to tickets, not to upsellings
   let discountCodeAmount = 0;
-  if (appliedDiscount) {
+  if (appliedDiscount && ticketsSubtotal > 0) {
     if (appliedDiscount.type === 'PERCENT') {
-      discountCodeAmount = (totalSubtotal * parseFloat(appliedDiscount.value)) / 100;
+      discountCodeAmount = (ticketsSubtotal * parseFloat(appliedDiscount.value)) / 100;
     } else {
-      discountCodeAmount = parseFloat(appliedDiscount.value);
+      const fixedDiscount = parseFloat(appliedDiscount.value);
+      discountCodeAmount = Math.min(fixedDiscount, ticketsSubtotal);
     }
   }
 
@@ -551,6 +558,83 @@ export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride 
     }, isInIframe ? 1000 : 2000);
   } catch (err) {
     const errorMessage = err.message || 'Payment confirmation failed. Please contact support if you were charged.';
+    $embed.update({
+      error: errorMessage,
+    });
+    throw err;
+  }
+};
+
+/** Completes a free order (total <= 0) without payment, then redirects to confirmation. */
+export const handleFreeOrderComplete = async (confirmationUrlOverride = null) => {
+  try {
+    $embed.update({ error: null });
+
+    const { order, form } = $embed.value;
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    await paymentsAPI.confirmFreePayment(order.id);
+
+    const updatedOrder = await ordersAPI.getById(order.id);
+    $embed.update({ order: updatedOrder });
+
+    let redirectUrl;
+
+    const hasConfirmationUrlOverride = confirmationUrlOverride &&
+      typeof confirmationUrlOverride === 'string' &&
+      confirmationUrlOverride.trim() !== '';
+
+    const hasFormUrl = form?.order_confirmation_url &&
+      typeof form.order_confirmation_url === 'string' &&
+      form.order_confirmation_url.trim() !== '';
+
+    if (hasConfirmationUrlOverride) {
+      redirectUrl = buildConfirmationUrl(confirmationUrlOverride, updatedOrder);
+    } else if (hasFormUrl) {
+      redirectUrl = buildConfirmationUrl(form.order_confirmation_url, updatedOrder);
+    } else {
+      redirectUrl = `/embed/order-confirmation/${updatedOrder.id}`;
+    }
+
+    const orderDetails = {
+      orderId: updatedOrder.id,
+      customerEmail: updatedOrder.customer_email || '',
+      customerName: updatedOrder.customer_name || '',
+      total: updatedOrder.total?.toString() || '0',
+      subtotal: updatedOrder.subtotal?.toString() || '0',
+      discountAmount: updatedOrder.discount_amount?.toString() || '0',
+      status: updatedOrder.status || '',
+      eventTitle: updatedOrder.events?.title || '',
+      discountCode: updatedOrder.discount_codes?.code || '',
+      createdAt: updatedOrder.created_at || '',
+      paymentIntentId: updatedOrder.payment_intent_id || '',
+      orderItems: updatedOrder.order_items?.map(item => ({
+        ticketTypeName: item.ticket_types?.name || item.upsellings?.item || '',
+        quantity: item.quantity,
+        unitPrice: item.unit_price?.toString() || '0',
+        subtotal: item.subtotal?.toString() || '0',
+      })) || [],
+    };
+
+    const isInIframe = window.parent && window.parent !== window;
+
+    if (isInIframe) {
+      window.parent.postMessage({
+        type: 'order-complete',
+        redirectUrl,
+        orderDetails,
+        order: updatedOrder,
+      }, '*');
+    }
+
+    setTimeout(() => {
+      window.location.href = redirectUrl;
+    }, isInIframe ? 1000 : 2000);
+  } catch (err) {
+    const errorMessage = err.message || 'Unable to complete order. Please try again.';
     $embed.update({
       error: errorMessage,
     });

@@ -366,6 +366,10 @@ export const edgeFunctionHelpers = {
       method: 'POST',
       body: { action: 'createPaymentSession', orderId },
     }),
+    confirmFreePayment: (orderId) => callEdgeFunction('payments', {
+      method: 'POST',
+      body: { action: 'confirmFreePayment', orderId },
+    }),
     confirmPayment: (orderId, paymentData) => callEdgeFunction('payments', {
       method: 'POST',
       body: { action: 'confirmPayment', orderId, paymentData },

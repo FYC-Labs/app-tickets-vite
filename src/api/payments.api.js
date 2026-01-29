@@ -6,6 +6,11 @@ export const paymentsAPI = {
     return result.data;
   },
 
+  async confirmFreePayment(orderId) {
+    const result = await edgeFunctionHelpers.payments.confirmFreePayment(orderId);
+    return result.data;
+  },
+
   async confirmPayment(orderId, paymentData) {
     const result = await edgeFunctionHelpers.payments.confirmPayment(orderId, paymentData);
     return result.data;

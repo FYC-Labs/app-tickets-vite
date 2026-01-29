@@ -110,30 +110,41 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
     }
 
     handleCloseModal();
-    loadDiscounts(eventId);
-    if (typeof onUpdate === 'function') onUpdate();
+    if (typeof onUpdate === 'function') {
+      await onUpdate();
+    } else {
+      await loadDiscounts(eventId);
+    }
   } catch (error) {
     showToast('Error saving discount', 'error');
   }
 };
 
-export const handleDelete = async (id, eventId) => {
+export const handleDelete = async (id, eventId, onUpdate) => {
   if (!window.confirm('Are you sure you want to delete this discount code?')) return;
 
   try {
     await discountsAPI.delete(id);
     showToast('Discount deleted successfully', 'success');
-    loadDiscounts(eventId);
+    if (typeof onUpdate === 'function') {
+      onUpdate();
+    } else {
+      await loadDiscounts(eventId);
+    }
   } catch (error) {
     showToast('Error deleting discount', 'error');
   }
 };
 
-export const handleToggleActive = async (discount, eventId) => {
+export const handleToggleActive = async (discount, eventId, onUpdate) => {
   try {
     await discountsAPI.update(discount.id, { is_active: !discount.is_active });
     showToast(`Discount ${!discount.is_active ? 'activated' : 'deactivated'}`, 'success');
-    loadDiscounts(eventId);
+    if (typeof onUpdate === 'function') {
+      onUpdate();
+    } else {
+      await loadDiscounts(eventId);
+    }
   } catch (error) {
     showToast('Error updating discount', 'error');
   }

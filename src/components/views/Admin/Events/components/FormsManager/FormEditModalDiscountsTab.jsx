@@ -28,7 +28,7 @@ function FormEditModalDiscountsTab({ discounts = [], eventId, onUpdate }) {
   };
 
   const onFormSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     await handleSubmit(e, eventId, onUpdate);
     setEditorOpen(false);
   };
@@ -43,7 +43,7 @@ function FormEditModalDiscountsTab({ discounts = [], eventId, onUpdate }) {
         </Button>
       </div>
 
-      <Form onSubmit={onFormSubmit}>
+      <div>
         <Table responsive size="sm" className="form-edit-inline-table table-bordered mb-0 align-middle">
           <thead>
             <tr>
@@ -127,7 +127,7 @@ function FormEditModalDiscountsTab({ discounts = [], eventId, onUpdate }) {
                     <Button size="sm" variant="outline-secondary" type="button" onClick={closeEditor} aria-label="Cancel">
                       <FontAwesomeIcon icon={faTimes} />
                     </Button>
-                    <Button size="sm" variant="primary" type="submit" aria-label="Save">
+                    <Button size="sm" variant="primary" type="button" onClick={onFormSubmit} aria-label="Save">
                       <FontAwesomeIcon icon={faCheck} />
                     </Button>
                   </div>
@@ -159,7 +159,7 @@ function FormEditModalDiscountsTab({ discounts = [], eventId, onUpdate }) {
                     size="sm"
                     variant="link"
                     className="p-0 text-decoration-none"
-                    onClick={() => handleToggleActive(discount, eventId).then(() => onUpdate?.())}
+                    onClick={() => handleToggleActive(discount, eventId, onUpdate)}
                     aria-label={discount.is_active ? 'Deactivate' : 'Activate'}
                   >
                     <span className={`badge bg-${discount.is_active ? 'success' : 'secondary'}`}>
@@ -182,7 +182,7 @@ function FormEditModalDiscountsTab({ discounts = [], eventId, onUpdate }) {
                       size="sm"
                       variant="outline-danger"
                       type="button"
-                      onClick={() => handleDelete(discount.id, eventId).then(() => onUpdate?.())}
+                      onClick={() => handleDelete(discount.id, eventId, onUpdate)}
                       aria-label="Delete"
                     >
                       <FontAwesomeIcon icon={faTrash} />
@@ -193,7 +193,7 @@ function FormEditModalDiscountsTab({ discounts = [], eventId, onUpdate }) {
             ))}
           </tbody>
         </Table>
-      </Form>
+      </div>
     </div>
   );
 }

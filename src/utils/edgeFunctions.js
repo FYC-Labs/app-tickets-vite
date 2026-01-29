@@ -328,6 +328,10 @@ export const edgeFunctionHelpers = {
       method: 'POST',
       body: { action: 'getSubmissions', formId },
     }),
+    updateSubmission: (submissionId, responses) => callEdgeFunction('forms', {
+      method: 'POST',
+      body: { action: 'updateSubmission', submissionId, responses },
+    }),
   },
 
   discounts: {

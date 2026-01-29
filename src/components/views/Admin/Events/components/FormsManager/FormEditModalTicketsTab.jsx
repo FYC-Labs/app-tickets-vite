@@ -37,7 +37,7 @@ function FormEditModalTicketsTab({ tickets, eventId, onUpdate }) {
   };
 
   const onFormSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     await handleSubmit(e, eventId, onUpdate);
     setEditorOpen(false);
   };
@@ -52,7 +52,7 @@ function FormEditModalTicketsTab({ tickets, eventId, onUpdate }) {
         </Button>
       </div>
 
-      <Form onSubmit={onFormSubmit}>
+      <div>
         <Table responsive size="sm" className="form-edit-inline-table table-bordered mb-0 align-middle">
           <thead>
             <tr>
@@ -168,7 +168,7 @@ function FormEditModalTicketsTab({ tickets, eventId, onUpdate }) {
                       <Button size="sm" variant="outline-secondary" type="button" onClick={closeEditor} aria-label="Cancel">
                         <FontAwesomeIcon icon={faTimes} />
                       </Button>
-                      <Button size="sm" variant="primary" type="submit" aria-label="Save">
+                      <Button size="sm" variant="primary" type="button" onClick={onFormSubmit} aria-label="Save">
                         <FontAwesomeIcon icon={faCheck} />
                       </Button>
                     </div>
@@ -332,7 +332,7 @@ function FormEditModalTicketsTab({ tickets, eventId, onUpdate }) {
             })}
           </tbody>
         </Table>
-      </Form>
+      </div>
     </div>
   );
 }

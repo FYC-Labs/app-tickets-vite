@@ -1,19 +1,22 @@
 /* eslint-disable no-nested-ternary */
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Row, Col, Form, Alert, Button } from 'react-bootstrap';
 import { AccruPay } from 'accru-pay-react';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
+import { formatPhone } from '@src/components/global/Inputs/UniversalInput/_helpers/universalinput.events';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import ordersAPI from '@src/api/orders.api';
 import paymentsAPI from '@src/api/payments.api';
+import formsAPI from '@src/api/forms.api';
 import CreditCardForm from './CreditCardForm';
 import OrderSummary from './OrderSummary';
 import {
   handleUpsellingChange,
   handleUpsellingCustomFieldChange,
+  handleFieldChange,
   handlePaymentSuccess,
   handleFreeOrderComplete,
   getUpsellingDiscountAmount,
@@ -21,8 +24,14 @@ import {
 
 function Step2Upsellings({ onGoBack }) {
   const [searchParams] = useSearchParams();
-  const { form, upsellings } = $embed.value;
+  const { form, upsellings, formData } = $embed.value;
   const { selectedTickets, selectedUpsellings, upsellingCustomFields, order, paymentSession } = $embed.value;
+
+  const requestPhone = form?.request_phone_number === true;
+  const requestPreference = form?.request_communication_preference === true;
+  const showExtraFields = requestPhone || requestPreference;
+  const hasPreferredChannel = Boolean(formData?.preferred_channel?.trim?.());
+  const isContactPreferencesValid = !requestPreference || hasPreferredChannel;
 
   const totalTicketsSelected = Object.values(selectedTickets || {}).reduce((sum, qty) => sum + (qty || 0), 0);
 
@@ -82,6 +91,44 @@ function Step2Upsellings({ onGoBack }) {
     }
   }, [order?.id, order?.total]);
 
+  // Update form_submission with phone_number, preferred_channel, and custom schema fields (debounced)
+  const schemaKeys = useMemo(
+    () => form?.schema?.map((f) => (f.field_id_string != null ? f.field_id_string : f.label)) ?? [],
+    [form?.schema],
+  );
+  const contactPrefsKey = JSON.stringify({
+    phone_number: $embed.value.formData?.phone_number,
+    preferred_channel: $embed.value.formData?.preferred_channel,
+    ...Object.fromEntries(schemaKeys.map((k) => [k, $embed.value.formData?.[k]])),
+  });
+  const debounceRef = useRef(null);
+  useEffect(() => {
+    const submissionId = order?.form_submission_id;
+    if (!submissionId) return () => {};
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      debounceRef.current = null;
+      const currentFormData = $embed.value.formData;
+      const patch = {};
+      if (currentFormData?.phone_number !== undefined) patch.phone_number = currentFormData.phone_number ?? null;
+      if (currentFormData?.preferred_channel !== undefined) patch.preferred_channel = currentFormData.preferred_channel ?? null;
+      schemaKeys.forEach((key) => {
+        if (currentFormData?.[key] !== undefined) patch[key] = currentFormData[key] ?? null;
+      });
+      if (Object.keys(patch).length === 0) return;
+      try {
+        await formsAPI.updateSubmission(submissionId, patch);
+      } catch {
+        // Non-blocking
+      }
+    }, 500);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [order?.form_submission_id, contactPrefsKey, schemaKeys]);
+
   const upsellingsKey = JSON.stringify($embed.value.selectedUpsellings || {});
   const customFieldsKey = JSON.stringify($embed.value.upsellingCustomFields || {});
   useEffectAsync(async () => {
@@ -105,36 +152,47 @@ function Step2Upsellings({ onGoBack }) {
 
       const upsellingOrderItems = upsellingEntries
         .filter(([, quantity]) => quantity > 0)
-        .map(([upsellingId, quantity]) => {
+        .flatMap(([upsellingId, quantity]) => {
           const upselling = currentUpsellings.find((u) => u.id === upsellingId);
           if (!upselling) {
-            return null;
+            return [];
           }
 
-          const customFieldValues = (currentUpsellingCustomFields && currentUpsellingCustomFields[upsellingId]) || {};
-
+          const unitPrice = parseFloat(upselling.amount ?? upselling.price);
+          const rawCustom = (currentUpsellingCustomFields && currentUpsellingCustomFields[upsellingId]) || {};
           const hasCustomFields = upselling.custom_fields && upselling.custom_fields.length > 0;
-          if (hasCustomFields) {
+
+          if (!hasCustomFields) {
+            return [
+              {
+                upselling_id: upsellingId,
+                quantity,
+                unit_price: unitPrice,
+                custom_fields: {},
+              },
+            ];
+          }
+
+          const perUnitList = Array.isArray(rawCustom) ? rawCustom : (rawCustom && typeof rawCustom === 'object' ? [rawCustom] : []);
+          const items = [];
+          for (let i = 0; i < quantity; i++) {
+            const customFieldValues = perUnitList[i] && typeof perUnitList[i] === 'object' ? perUnitList[i] : {};
             const allFieldsComplete = upselling.custom_fields.every(field => {
               const value = customFieldValues[field.label];
               return value !== undefined && value !== null && value !== '';
             });
-
             if (!allFieldsComplete) {
-              return null;
+              return [];
             }
+            items.push({
+              upselling_id: upsellingId,
+              quantity: 1,
+              unit_price: unitPrice,
+              custom_fields: customFieldValues,
+            });
           }
-
-          const unitPrice = parseFloat(upselling.amount ?? upselling.price);
-
-          return {
-            upselling_id: upsellingId,
-            quantity,
-            unit_price: unitPrice,
-            custom_fields: customFieldValues,
-          };
-        })
-        .filter(Boolean);
+          return items;
+        });
 
       const upsellingDiscountAmount = getUpsellingDiscountAmount();
       const updatedOrder = await ordersAPI.updatePendingItems(
@@ -148,13 +206,36 @@ function Step2Upsellings({ onGoBack }) {
     }
   }, [order?.id, upsellingsKey, customFieldsKey]);
 
-  const renderUpsellingCustomField = (field, upsellingId, index) => {
-    const fieldKey = `${upsellingId}_${field.label}`;
-    const value = upsellingCustomFields[upsellingId]?.[field.label] || '';
-
+  const renderFormSchemaField = (field, index) => {
+    const key = field.field_id_string != null ? field.field_id_string : field.label;
+    const value = formData?.[key] ?? '';
     return (
       <FormDynamicField
         key={index}
+        field={field}
+        index={index}
+        value={value}
+        groupClassName="mb-16"
+        labelClassName="small"
+        selectPlaceholder={field.placeholder || 'Select...'}
+        onChange={(newValue) => handleFieldChange(field.label, newValue, field.field_id_string)}
+      />
+    );
+  };
+
+  const renderUpsellingCustomField = (field, upsellingId, unitIndex, index) => {
+    const unitValues = upsellingCustomFields[upsellingId];
+    const isArray = Array.isArray(unitValues);
+    const value = isArray && unitValues[unitIndex]
+      ? (unitValues[unitIndex][field.label] ?? '')
+      : !isArray && unitValues
+        ? (unitValues[field.label] ?? '')
+        : '';
+    const fieldKey = `${upsellingId}_${unitIndex}_${field.label}`;
+
+    return (
+      <FormDynamicField
+        key={fieldKey}
         field={field}
         index={index}
         name={fieldKey}
@@ -162,7 +243,7 @@ function Step2Upsellings({ onGoBack }) {
         groupClassName="mb-16"
         labelClassName="small"
         selectPlaceholder={field.placeholder || 'Select...'}
-        onChange={(newValue) => handleUpsellingCustomFieldChange(upsellingId, field.label, newValue)}
+        onChange={(newValue) => handleUpsellingCustomFieldChange(upsellingId, unitIndex, field.label, newValue)}
       />
     );
   };
@@ -273,7 +354,16 @@ function Step2Upsellings({ onGoBack }) {
                   <Col md={12}>
                     <div className="border-top pt-16 mt-16">
                       <h6 className="small mb-16 fw-semibold">Additional Information</h6>
-                      {upselling.custom_fields.map((field, idx) => renderUpsellingCustomField(field, upselling.id, idx))}
+                      {Array.from({ length: selectedQty }, (_, unitIndex) => (
+                        <div key={`${upselling.id}_unit_${unitIndex}`} className="mb-24">
+                          {selectedQty > 1 && (
+                            <div className="small fw-semibold text-muted mb-8">
+                              {upselling.item ?? upselling.name} #{unitIndex + 1}
+                            </div>
+                          )}
+                          {upselling.custom_fields.map((field, idx) => renderUpsellingCustomField(field, upselling.id, unitIndex, idx))}
+                        </div>
+                      ))}
                     </div>
                   </Col>
                 </Row>
@@ -282,6 +372,59 @@ function Step2Upsellings({ onGoBack }) {
           </Card>
         );
       })}
+
+      {showExtraFields && (
+        <Card className="mt-32 border-0">
+          <Card.Body className="p-24">
+            <h6 className="mb-16 fw-semibold">Contact preferences</h6>
+            <Row>
+              {requestPhone && (
+                <Col xs={12} md={requestPreference ? 6 : 12} className="mb-16 mb-md-0">
+                  <Form.Group>
+                    <Form.Label className="small">Phone number</Form.Label>
+                    <UniversalInput
+                      type="tel"
+                      name="phone_number"
+                      value={formData?.phone_number ?? ''}
+                      customOnChange={(e) => handleFieldChange('phone_number', formatPhone(e.target.value))}
+                      placeholder="(555) 123-4567"
+                      className="form-control"
+                    />
+                  </Form.Group>
+                </Col>
+              )}
+              {requestPreference && (
+                <Col xs={12} md={requestPhone ? 6 : 12}>
+                  <Form.Group>
+                    <Form.Label className="small">How would you like to be contacted? *</Form.Label>
+                    <UniversalInput
+                      as="select"
+                      name="preferred_channel"
+                      value={formData?.preferred_channel ?? ''}
+                      customOnChange={(e) => handleFieldChange('preferred_channel', e.target.value)}
+                      className="form-control"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      <option value="email">Email</option>
+                      <option value="sms">SMS</option>
+                    </UniversalInput>
+                  </Form.Group>
+                </Col>
+              )}
+            </Row>
+          </Card.Body>
+        </Card>
+      )}
+
+      {form?.schema?.length > 0 && (
+        <Card className="mt-32 border-0">
+          <Card.Body className="p-24">
+            <h6 className="mb-16 fw-semibold">Additional information</h6>
+            {form.schema.map((field, index) => renderFormSchemaField(field, index))}
+          </Card.Body>
+        </Card>
+      )}
 
       {order && (
         <div className="mt-32">
@@ -308,7 +451,7 @@ function Step2Upsellings({ onGoBack }) {
                 variant="dark"
                 size="lg"
                 className="w-100"
-                disabled={isCompletingFree}
+                disabled={isCompletingFree || !isContactPreferencesValid}
                 onClick={async () => {
                   try {
                     setIsCompletingFree(true);
@@ -330,6 +473,11 @@ function Step2Upsellings({ onGoBack }) {
         {order && !isFreeOrder && providers && paymentSession && (
           <Card>
             <Card.Body>
+              {showExtraFields && !isContactPreferencesValid && (
+                <Alert variant="warning" className="mb-16">
+                  Please select how you would like to be contacted before completing your order.
+                </Alert>
+              )}
               <AccruPay
                 sessionToken={paymentSession.sessionToken}
                 preferredProvider="nuvei"
@@ -337,6 +485,7 @@ function Step2Upsellings({ onGoBack }) {
               >
                 <CreditCardForm
                   order={order}
+                  submitDisabled={showExtraFields && !isContactPreferencesValid}
                   onPaymentSuccess={async (paymentData) => {
                     try {
                       await handlePaymentSuccess(paymentData, confirmationUrlOverride);

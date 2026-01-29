@@ -45,6 +45,11 @@ export const formsAPI = {
     const result = await edgeFunctionHelpers.forms.getSubmissions(formId);
     return result.data;
   },
+
+  async updateSubmission(submissionId, responses) {
+    const result = await edgeFunctionHelpers.forms.updateSubmission(submissionId, responses);
+    return result.data;
+  },
 };
 
 export default formsAPI;

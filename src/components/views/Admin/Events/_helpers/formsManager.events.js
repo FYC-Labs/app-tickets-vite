@@ -15,6 +15,8 @@ export const $formManagerForm = Signal({
   show_description: true,
   show_discount_code: true,
   show_tickets_remaining: true,
+  request_phone_number: false,
+  request_communication_preference: false,
   theme: 'light',
   order_confirmation_url: '',
 });
@@ -66,6 +68,8 @@ export const handleOpenModal = (form = null) => {
       show_description: form.show_description !== undefined ? form.show_description : true,
       show_discount_code: form.show_discount_code !== undefined ? form.show_discount_code : true,
       show_tickets_remaining: form.show_tickets_remaining !== undefined ? form.show_tickets_remaining : true,
+      request_phone_number: form.request_phone_number ?? false,
+      request_communication_preference: form.request_communication_preference ?? false,
       theme: form.theme || 'light',
       order_confirmation_url: form.order_confirmation_url || '',
     });
@@ -249,6 +253,8 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       show_description: formData.show_description,
       show_discount_code: formData.show_discount_code,
       show_tickets_remaining: formData.show_tickets_remaining,
+      request_phone_number: formData.request_phone_number ?? false,
+      request_communication_preference: formData.request_communication_preference ?? false,
       theme: formData.theme,
       order_confirmation_url: formData.order_confirmation_url || null,
     };

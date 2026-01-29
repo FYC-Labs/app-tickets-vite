@@ -6,7 +6,7 @@ import * as events from '../_helpers/checkout.events';
 
 const PAYMENT_PROCESSOR = 'nuvei';
 
-function CreditCardForm({ order, onPaymentSuccess }) {
+function CreditCardForm({ order, onPaymentSuccess, submitDisabled = false }) {
   const AccruPaymentForm = form(PAYMENT_PROCESSOR);
 
   const handleSuccess = async (paymentData) => {
@@ -79,7 +79,7 @@ function CreditCardForm({ order, onPaymentSuccess }) {
           <div className="d-grid">
             <AccruPaymentForm.SubmitBtn
               className="btn btn-primary btn-lg"
-              text={`Place Order $${parseFloat(order.total).toFixed(2)}`}
+              text={`Pay Now $${parseFloat(order.total).toFixed(2)}`}
               onSubmit={() => {
                 isProcessingPayment.value = true;
               }}
@@ -88,7 +88,7 @@ function CreditCardForm({ order, onPaymentSuccess }) {
               onComplete={() => {
                 isProcessingPayment.value = false;
               }}
-              disabled={isProcessingPayment.value}
+              disabled={isProcessingPayment.value || submitDisabled}
             />
           </div>
         </Form>

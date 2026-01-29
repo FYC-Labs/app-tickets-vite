@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Form, Button, Row, Col, Alert, Badge, Card } from 'react-bootstrap';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
-import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import paymentsAPI from '@src/api/payments.api';
 import {
   handleFieldChange,
@@ -68,24 +67,6 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
     }
   };
 
-  const renderField = (field, index) => {
-    const key =
-      field.field_id_string !== null && field.field_id_string !== undefined
-        ? field.field_id_string
-        : field.label;
-    const value = formData[key] || '';
-
-    return (
-      <FormDynamicField
-        key={index}
-        field={field}
-        index={index}
-        value={value}
-        onChange={(newValue) => handleFieldChange(field.label, newValue, field.field_id_string)}
-      />
-    );
-  };
-
   return (
     <>
       {form && (
@@ -125,8 +106,6 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
             </Col>
           </Row>
         </Form.Group>
-
-        {form?.schema?.map((field, index) => renderField(field, index))}
 
         {tickets.length > 0 && (
           <div className="mb-32 mt-32">

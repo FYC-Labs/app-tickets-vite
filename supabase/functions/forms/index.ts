@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
       SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const { action, filters, id, formId, responses, email, data } = await req.json();
+    const { action, filters, id, formId, submissionId, responses, email, data } = await req.json();
 
     let result;
 
@@ -253,6 +253,41 @@ Deno.serve(async (req: Request) => {
 
         if (error) throw error;
         result = { data: submissions };
+        break;
+      }
+
+      case "updateSubmission": {
+        if (!submissionId) {
+          throw new Error("submissionId is required for updateSubmission");
+        }
+        if (responses == null || typeof responses !== "object") {
+          throw new Error("responses must be an object");
+        }
+        const { data: existing, error: fetchError } = await supabaseClient
+          .from("form_submissions")
+          .select("responses")
+          .eq("id", submissionId)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!existing) {
+          throw new Error("Form submission not found");
+        }
+
+        const currentResponses = (existing.responses != null && typeof existing.responses === "object")
+          ? existing.responses
+          : {};
+        const mergedResponses = { ...currentResponses, ...responses };
+
+        const { data: updated, error: updateError } = await supabaseClient
+          .from("form_submissions")
+          .update({ responses: mergedResponses })
+          .eq("id", submissionId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        result = { data: updated };
         break;
       }
 

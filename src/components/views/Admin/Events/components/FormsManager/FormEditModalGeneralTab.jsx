@@ -62,6 +62,18 @@ function FormEditModalGeneralTab() {
             signal={$formManagerForm}
             label="Show tickets remaining"
           />
+          <UniversalInput
+            type="checkbox"
+            name="request_phone_number"
+            signal={$formManagerForm}
+            label="Request phone number"
+          />
+          <UniversalInput
+            type="checkbox"
+            name="request_communication_preference"
+            signal={$formManagerForm}
+            label="Request communication preference"
+          />
         </div>
 
         <Form.Group className="mb-24">

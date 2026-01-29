@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-restricted-syntax, no-nested-ternary */
 import { $embed } from '@src/signals';
 import formsAPI from '@src/api/forms.api';
 import ticketsAPI from '@src/api/tickets.api';
@@ -203,6 +203,18 @@ export const handleApplyDiscount = async (formId, eventId) => {
   }
 };
 
+/** Normalize upselling custom fields to per-unit array: [ { label: value }, ... ] */
+const getPerUnitCustomFields = (current, upsellingId, newLength) => {
+  const existing = current[upsellingId];
+  const isArray = Array.isArray(existing);
+  const list = isArray ? [...existing] : existing && typeof existing === 'object' ? [{ ...existing }] : [];
+  const result = [];
+  for (let i = 0; i < newLength; i++) {
+    result.push(i < list.length && list[i] && typeof list[i] === 'object' ? { ...list[i] } : {});
+  }
+  return result;
+};
+
 export const handleUpsellingChange = (upsellingId, quantity) => {
   const selectedUpsellings = { ...$embed.value.selectedUpsellings };
   const newQuantity = parseInt(quantity, 10) || 0;
@@ -211,6 +223,8 @@ export const handleUpsellingChange = (upsellingId, quantity) => {
   const upsellingCustomFields = { ...$embed.value.upsellingCustomFields };
   if (newQuantity === 0) {
     delete upsellingCustomFields[upsellingId];
+  } else {
+    upsellingCustomFields[upsellingId] = getPerUnitCustomFields(upsellingCustomFields, upsellingId, newQuantity);
   }
 
   $embed.update({ selectedUpsellings, upsellingCustomFields });
@@ -218,12 +232,14 @@ export const handleUpsellingChange = (upsellingId, quantity) => {
   checkFormValidity();
 };
 
-export const handleUpsellingCustomFieldChange = (upsellingId, fieldLabel, value) => {
+/** unitIndex: 0-based index of the selected unit (e.g. shirt 1, shirt 2) */
+export const handleUpsellingCustomFieldChange = (upsellingId, unitIndex, fieldLabel, value) => {
   const upsellingCustomFields = { ...$embed.value.upsellingCustomFields };
-  if (!upsellingCustomFields[upsellingId]) {
-    upsellingCustomFields[upsellingId] = {};
-  }
-  upsellingCustomFields[upsellingId][fieldLabel] = value;
+  const existing = upsellingCustomFields[upsellingId];
+  const list = Array.isArray(existing) ? [...existing] : existing && typeof existing === 'object' ? [{ ...existing }] : [];
+  while (list.length <= unitIndex) list.push({});
+  list[unitIndex] = { ...list[unitIndex], [fieldLabel]: value };
+  upsellingCustomFields[upsellingId] = list;
   $embed.update({ upsellingCustomFields });
 };
 

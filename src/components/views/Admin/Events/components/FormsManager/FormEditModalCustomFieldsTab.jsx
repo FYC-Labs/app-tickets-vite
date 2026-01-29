@@ -2,12 +2,13 @@ import { Form, Row, Col, Card, Button, ListGroup } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
-import { $formManagerForm, $currentFormField } from '../../_helpers/formsManager.events';
 import {
   handleAddField,
   handleEditField,
   handleDeleteField,
   moveField,
+  $formManagerForm,
+  $currentFormField,
 } from '../../_helpers/formsManager.events';
 import { FIELD_TYPES } from '../../_helpers/formsManager.consts';
 import DraggableField from './DraggableField';

@@ -51,6 +51,8 @@ export const $embed = Signal({
   totals: { subtotal: 0, discount_amount: 0, total: 0 },
   error: null,
   isFormValid: false,
+  order: null,
+  paymentSession: null,
 });
 export const $checkout = Signal({
   order: null,

@@ -281,6 +281,10 @@ export const edgeFunctionHelpers = {
       method: 'POST',
       body: { action: 'addItemsToOrder', id, items },
     }),
+    updatePendingItems: (id, items, upsellingDiscountAmount = 0) => callEdgeFunction('orders', {
+      method: 'POST',
+      body: { action: 'updatePendingItems', id, items, upsellingDiscountAmount },
+    }),
     delete: (id) => callEdgeFunction('orders', {
       method: 'POST',
       body: { action: 'delete', id },

@@ -9,29 +9,10 @@ function EmbedPage() {
   const { form } = $embed.value;
   const confirmationUrlOverride = searchParams.get('confirmationUrl');
 
-  const handleSubmitSuccess = (data) => {
-    console.log('data', data);
-    if (data.order) {
-      // Build checkout URL with embed=true and optional confirmationUrl
-      const params = new URLSearchParams();
-      params.set('embed', 'true'); // Indicate we're in an iframe
-
-      if (confirmationUrlOverride) {
-        params.set('confirmationUrl', confirmationUrlOverride);
-      }
-
-      const checkoutUrl = `/embed/checkout/${data.order.id}?${params.toString()}`;
-      window.location.href = checkoutUrl;
-    } else {
-      alert('Form submitted successfully!');
-    }
-  };
-
   return (
     <Container className="py-5" style={{ maxWidth: '800px' }}>
       <EventForm
         formId={formId}
-        onSubmitSuccess={handleSubmitSuccess}
         theme={form?.theme || 'light'}
       />
     </Container>

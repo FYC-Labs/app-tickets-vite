@@ -5,6 +5,7 @@ import ticketsAPI from '@src/api/tickets.api';
 import ordersAPI from '@src/api/orders.api';
 import discountsAPI from '@src/api/discounts.api';
 import upsellingsAPI from '@src/api/upsellings.api';
+import paymentsAPI from '@src/api/payments.api';
 
 export const loadFormData = async (formId, eventId) => {
   try {
@@ -19,14 +20,12 @@ export const loadFormData = async (formId, eventId) => {
         const ticketsData = await ticketsAPI.getByEventId(formData.event_id);
         const now = new Date();
 
-        // Filter tickets by form's available_ticket_ids if specified
         let filtered = ticketsData || [];
 
         if (formData.available_ticket_ids && formData.available_ticket_ids.length > 0) {
           filtered = filtered.filter((t) => formData.available_ticket_ids.includes(t.id));
         }
 
-        // Then apply date and availability filters
         filtered = filtered.filter((t) => {
           const start = new Date(t.sales_start);
           const end = new Date(t.sales_end);
@@ -38,14 +37,11 @@ export const loadFormData = async (formId, eventId) => {
 
         const upsellingsData = await upsellingsAPI.getByEventId(formData.event_id);
         let filteredUpsellings = (upsellingsData || []).filter(
-          (u) => u.upselling_strategy === 'PRE-CHECKOUT'
+          (u) => u.upselling_strategy === 'PRE-CHECKOUT',
         );
 
-        // Solo mostrar upsellings ligados al formulario (available_upselling_ids)
         if (formData.available_upselling_ids && formData.available_upselling_ids.length > 0) {
-          filteredUpsellings = filteredUpsellings.filter((u) =>
-            formData.available_upselling_ids.includes(u.id)
-          );
+          filteredUpsellings = filteredUpsellings.filter((u) => formData.available_upselling_ids.includes(u.id));
         }
 
         $embed.update({ upsellings: filteredUpsellings });
@@ -69,43 +65,90 @@ export const loadFormData = async (formId, eventId) => {
   }
 };
 
+export const getUpsellingDiscountAmount = () => {
+  const { selectedTickets, selectedUpsellings, tickets, upsellings } = $embed.value;
+
+  let ticketsSubtotal = 0;
+  Object.entries(selectedTickets || {}).forEach(([ticketId, quantity]) => {
+    if (quantity > 0) {
+      const ticket = tickets.find((t) => t.id === ticketId);
+      if (ticket) {
+        ticketsSubtotal += parseFloat(ticket.price) * quantity;
+      }
+    }
+  });
+
+  let upsellingDiscountAmount = 0;
+  Object.entries(selectedUpsellings || {}).forEach(([upsellingId, quantity]) => {
+    const qty = parseInt(quantity, 10) || 0;
+    if (qty > 0) {
+      const upselling = upsellings.find((u) => u.id === upsellingId);
+      if (upselling) {
+        const discountType = upselling.discount_type?.toLowerCase();
+        const discountValue = upselling.discount;
+        const quantityRule = upselling.quantity_rule || 'USER_CAN_CHANGE';
+
+        if (discountValue != null && !isNaN(parseFloat(discountValue))) {
+          const discountAmount = parseFloat(discountValue);
+          const isUserCanChange = quantityRule === 'USER_CAN_CHANGE';
+
+          if (discountType === 'percent' && discountAmount > 0 && ticketsSubtotal > 0) {
+            const baseDiscount = (ticketsSubtotal * discountAmount) / 100;
+            upsellingDiscountAmount += isUserCanChange ? baseDiscount * qty : baseDiscount;
+          } else if (discountType === 'fixed' && discountAmount > 0) {
+            const baseDiscount = discountAmount;
+            upsellingDiscountAmount += isUserCanChange ? baseDiscount * qty : baseDiscount;
+          }
+        }
+      }
+    }
+  });
+
+  return parseFloat(upsellingDiscountAmount.toFixed(2));
+};
+
 export const calculateTotals = () => {
   const { selectedTickets, selectedUpsellings, appliedDiscount, tickets, upsellings } = $embed.value;
 
-  let subtotal = 0;
+  let ticketsSubtotal = 0;
   Object.entries(selectedTickets).forEach(([ticketId, quantity]) => {
     if (quantity > 0) {
       const ticket = tickets.find((t) => t.id === ticketId);
       if (ticket) {
-        subtotal += parseFloat(ticket.price) * quantity;
+        ticketsSubtotal += parseFloat(ticket.price) * quantity;
       }
     }
   });
 
+  let upsellingsSubtotal = 0;
   Object.entries(selectedUpsellings).forEach(([upsellingId, quantity]) => {
     if (quantity > 0) {
       const upselling = upsellings.find((u) => u.id === upsellingId);
       if (upselling) {
-        subtotal += parseFloat(upselling.amount ?? upselling.price) * quantity;
+        upsellingsSubtotal += parseFloat(upselling.amount ?? upselling.price) * quantity;
       }
     }
   });
 
-  let discountAmount = 0;
+  const upsellingDiscountAmount = getUpsellingDiscountAmount();
+
+  const totalSubtotal = ticketsSubtotal + upsellingsSubtotal;
+  let discountCodeAmount = 0;
   if (appliedDiscount) {
     if (appliedDiscount.type === 'PERCENT') {
-      discountAmount = (subtotal * parseFloat(appliedDiscount.value)) / 100;
+      discountCodeAmount = (totalSubtotal * parseFloat(appliedDiscount.value)) / 100;
     } else {
-      discountAmount = parseFloat(appliedDiscount.value);
+      discountCodeAmount = parseFloat(appliedDiscount.value);
     }
   }
 
-  const total = Math.max(0, subtotal - discountAmount);
+  const totalDiscountAmount = upsellingDiscountAmount + discountCodeAmount;
+  const total = Math.max(0, totalSubtotal - totalDiscountAmount);
 
   $embed.update({
     totals: {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      discount_amount: parseFloat(discountAmount.toFixed(2)),
+      subtotal: parseFloat(totalSubtotal.toFixed(2)),
+      discount_amount: parseFloat(totalDiscountAmount.toFixed(2)),
       total: parseFloat(total.toFixed(2)),
     },
   });
@@ -157,13 +200,12 @@ export const handleUpsellingChange = (upsellingId, quantity) => {
   const selectedUpsellings = { ...$embed.value.selectedUpsellings };
   const newQuantity = parseInt(quantity, 10) || 0;
   selectedUpsellings[upsellingId] = newQuantity;
-  
-  // Clear custom fields if quantity is 0
+
   const upsellingCustomFields = { ...$embed.value.upsellingCustomFields };
   if (newQuantity === 0) {
     delete upsellingCustomFields[upsellingId];
   }
-  
+
   $embed.update({ selectedUpsellings, upsellingCustomFields });
   calculateTotals();
   checkFormValidity();
@@ -218,14 +260,12 @@ export const checkFormValidity = () => {
     return;
   }
 
-  // Basic email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(formData.email)) {
     $embed.update({ isFormValid: false });
     return;
   }
 
-  // Check all required form fields
   if (form?.schema) {
     for (const field of form.schema) {
       if (field.required) {
@@ -242,9 +282,7 @@ export const checkFormValidity = () => {
       }
     }
   }
-  console.log('tickets', tickets);
 
-  // Check if at least one ticket is selected (only if tickets are available)
   if (tickets.length > 0) {
     const hasTickets = Object.values(selectedTickets).some((qty) => qty > 0);
     if (!hasTickets) {
@@ -257,12 +295,18 @@ export const checkFormValidity = () => {
 };
 
 export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
-  e.preventDefault();
+  const isUserSubmit = !!e;
 
-  const validationError = validateForm();
-  if (validationError) {
-    $embed.update({ error: validationError });
-    return;
+  if (e && typeof e.preventDefault === 'function') {
+    e.preventDefault();
+  }
+
+  if (isUserSubmit) {
+    const validationError = validateForm();
+    if (validationError) {
+      $embed.update({ error: validationError });
+      return;
+    }
   }
 
   try {
@@ -273,7 +317,15 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
     let submissionId = null;
 
     if (form) {
-      const submission = await formsAPI.submitForm(form.id, formData, formData.email);
+      const {
+        card_number: _cardNumber,
+        card_cvc: _cardCvc,
+        card_expiration: _cardExpiration,
+        cardholder_name: _cardholderName,
+        ...safeFormData
+      } = formData;
+
+      const submission = await formsAPI.submitForm(form.id, safeFormData, formData.email);
       submissionId = submission.id;
     }
 
@@ -331,13 +383,177 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
       onSubmitSuccess({ submission: submissionId });
     }
   } catch (err) {
-    console.log('err', err);
     $embed.update({ error: 'Error submitting form. Please try again.' });
   } finally {
     $embed.loadingEnd();
   }
 };
 
+export const createOrderForPayment = async (formId, eventId) => {
+  try {
+    const { form, formData, selectedTickets, appliedDiscount, totals, tickets } = $embed.value;
+
+    const hasTickets = Object.values(selectedTickets).some((qty) => qty > 0);
+    if (!hasTickets) {
+      return null;
+    }
+
+    const orderItems = Object.entries(selectedTickets)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([ticketId, quantity]) => {
+        const ticket = tickets.find((t) => t.id === ticketId);
+        return {
+          ticket_type_id: ticketId,
+          quantity,
+          unit_price: parseFloat(ticket.price),
+        };
+      });
+
+    let submissionId = null;
+    if (form) {
+      const {
+        card_number: _cardNumber,
+        card_cvc: _cardCvc,
+        card_expiration: _cardExpiration,
+        cardholder_name: _cardholderName,
+        ...safeFormData
+      } = formData;
+
+      const submission = await formsAPI.submitForm(form.id, safeFormData, formData.email);
+      submissionId = submission.id;
+    }
+
+    const orderData = {
+      event_id: form?.event_id || eventId,
+      form_submission_id: submissionId,
+      discount_code_id: appliedDiscount?.id || null,
+      subtotal: totals.subtotal,
+      discount_amount: totals.discount_amount,
+      total: totals.total,
+      status: 'PENDING',
+      customer_email: formData.email,
+      customer_name: formData.name || null,
+      items: orderItems,
+    };
+
+    const order = await ordersAPI.create(orderData);
+    $embed.update({ order });
+    return order;
+  } catch (err) {
+    console.error('Error creating order for payment:', err);
+    throw err;
+  }
+};
+
 export const updateDiscountCode = (code) => {
   $embed.update({ discountCode: code });
+};
+
+const buildConfirmationUrl = (baseUrl, order) => {
+  let absoluteUrl = baseUrl;
+  if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    absoluteUrl = `${window.location.origin}${baseUrl.startsWith('/') ? '' : '/'}${baseUrl}`;
+  }
+
+  const url = new URL(absoluteUrl);
+
+  url.searchParams.set('orderId', order.id);
+  url.searchParams.set('customerEmail', order.customer_email || '');
+  url.searchParams.set('customerName', order.customer_name || '');
+  url.searchParams.set('total', order.total?.toString() || '0');
+  url.searchParams.set('subtotal', order.subtotal?.toString() || '0');
+  url.searchParams.set('discountAmount', order.discount_amount?.toString() || '0');
+  url.searchParams.set('status', order.status || '');
+  url.searchParams.set('eventTitle', order.events?.title || '');
+  url.searchParams.set('discountCode', order.discount_codes?.code || '');
+  url.searchParams.set('createdAt', order.created_at || '');
+  url.searchParams.set('paymentIntentId', order.payment_intent_id || '');
+
+  if (order.order_items && order.order_items.length > 0) {
+    const itemsData = order.order_items.map(item => ({
+      ticketTypeName: item.ticket_types?.name || item.upsellings?.item || '',
+      quantity: item.quantity,
+      unitPrice: item.unit_price?.toString() || '0',
+      subtotal: item.subtotal?.toString() || '0',
+    }));
+    url.searchParams.set('orderItems', JSON.stringify(itemsData));
+  }
+
+  return url.toString();
+};
+
+export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride = null) => {
+  try {
+    $embed.update({ error: null });
+
+    const { order, form } = $embed.value;
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    await paymentsAPI.confirmPayment(order.id, paymentData);
+
+    const updatedOrder = await ordersAPI.getById(order.id);
+    $embed.update({ order: updatedOrder });
+
+    let redirectUrl;
+
+    const hasConfirmationUrlOverride = confirmationUrlOverride &&
+      typeof confirmationUrlOverride === 'string' &&
+      confirmationUrlOverride.trim() !== '';
+
+    const hasFormUrl = form?.order_confirmation_url &&
+      typeof form.order_confirmation_url === 'string' &&
+      form.order_confirmation_url.trim() !== '';
+
+    if (hasConfirmationUrlOverride) {
+      redirectUrl = buildConfirmationUrl(confirmationUrlOverride, updatedOrder);
+    } else if (hasFormUrl) {
+      redirectUrl = buildConfirmationUrl(form.order_confirmation_url, updatedOrder);
+    } else {
+      redirectUrl = `/embed/order-confirmation/${updatedOrder.id}`;
+    }
+
+    const orderDetails = {
+      orderId: updatedOrder.id,
+      customerEmail: updatedOrder.customer_email || '',
+      customerName: updatedOrder.customer_name || '',
+      total: updatedOrder.total?.toString() || '0',
+      subtotal: updatedOrder.subtotal?.toString() || '0',
+      discountAmount: updatedOrder.discount_amount?.toString() || '0',
+      status: updatedOrder.status || '',
+      eventTitle: updatedOrder.events?.title || '',
+      discountCode: updatedOrder.discount_codes?.code || '',
+      createdAt: updatedOrder.created_at || '',
+      paymentIntentId: updatedOrder.payment_intent_id || '',
+      orderItems: updatedOrder.order_items?.map(item => ({
+        ticketTypeName: item.ticket_types?.name || item.upsellings?.item || '',
+        quantity: item.quantity,
+        unitPrice: item.unit_price?.toString() || '0',
+        subtotal: item.subtotal?.toString() || '0',
+      })) || [],
+    };
+
+    const isInIframe = window.parent && window.parent !== window;
+
+    if (isInIframe) {
+      window.parent.postMessage({
+        type: 'order-complete',
+        redirectUrl,
+        orderDetails,
+        order: updatedOrder,
+      }, '*');
+    }
+
+    setTimeout(() => {
+      window.location.href = redirectUrl;
+    }, isInIframe ? 1000 : 2000);
+  } catch (err) {
+    const errorMessage = err.message || 'Payment confirmation failed. Please contact support if you were charged.';
+    $embed.update({
+      error: errorMessage,
+    });
+    throw err;
+  }
 };

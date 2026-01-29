@@ -48,18 +48,37 @@ export async function handleWebhook(
           .eq("status", "PENDING");
 
         if (!updateError) {
-          // Update ticket inventory
+          // Update ticket inventory (only items with ticket_type_id)
           const { data: orderItems } = await supabaseClient
             .from("order_items")
-            .select("ticket_type_id, quantity")
+            .select("ticket_type_id, upselling_id, quantity")
             .eq("order_id", orderId);
 
           if (orderItems) {
             for (const item of orderItems) {
-              await supabaseClient.rpc("increment_ticket_sold", {
-                ticket_id: item.ticket_type_id,
-                amount: item.quantity,
-              });
+              if (item.ticket_type_id != null) {
+                await supabaseClient.rpc("increment_ticket_sold", {
+                  ticket_id: item.ticket_type_id,
+                  amount: item.quantity,
+                });
+              }
+              // Update upselling sold count
+              if (item.upselling_id) {
+                const { data: upselling } = await supabaseClient
+                  .from("upsellings")
+                  .select("quantity, sold")
+                  .eq("id", item.upselling_id)
+                  .maybeSingle();
+                if (upselling && upselling.quantity !== null) {
+                  await supabaseClient
+                    .from("upsellings")
+                    .update({
+                      sold: (upselling.sold || 0) + item.quantity,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", item.upselling_id);
+                }
+              }
             }
           }
 

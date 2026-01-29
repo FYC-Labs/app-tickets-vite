@@ -142,13 +142,47 @@ async function updateTicketInventory(orderId: string, supabaseClient: any) {
   if (!orderItems) return [];
 
   for (const item of orderItems) {
-    await supabaseClient.rpc("increment_ticket_sold", {
-      ticket_id: item.ticket_type_id,
-      amount: item.quantity,
-    });
+    if (item.ticket_type_id != null) {
+      await supabaseClient.rpc("increment_ticket_sold", {
+        ticket_id: item.ticket_type_id,
+        amount: item.quantity,
+      });
+    }
   }
 
   return orderItems;
+}
+
+/**
+ * Updates upselling sold count after successful payment
+ */
+async function updateUpsellingSold(orderId: string, supabaseClient: any) {
+  const { data: orderItems } = await supabaseClient
+    .from("order_items")
+    .select("upselling_id, quantity")
+    .eq("order_id", orderId);
+
+  if (!orderItems) return;
+
+  for (const item of orderItems) {
+    if (item.upselling_id) {
+      const { data: upselling } = await supabaseClient
+        .from("upsellings")
+        .select("quantity, sold")
+        .eq("id", item.upselling_id)
+        .maybeSingle();
+
+      if (upselling && upselling.quantity !== null) {
+        await supabaseClient
+          .from("upsellings")
+          .update({
+            sold: (upselling.sold || 0) + item.quantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", item.upselling_id);
+      }
+    }
+  }
 }
 
 /**
@@ -565,6 +599,9 @@ export async function confirmFreePayment(
     // Step 3: Update ticket inventory
     const orderItems = await updateTicketInventory(orderId, supabaseClient);
 
+    // Step 3.2: Update upselling sold count
+    await updateUpsellingSold(orderId, supabaseClient);
+
     // Step 3.5: Update discount code usage if applicable
     await updateDiscountCodeUsage(orderId, supabaseClient);
 
@@ -686,13 +723,15 @@ export async function confirmPayment(
     // Step 4: Update ticket inventory
     await updateTicketInventory(orderId, supabaseClient);
 
+    // Step 4.2: Update upselling sold count
+    await updateUpsellingSold(orderId, supabaseClient);
+
     // Step 5: Fetch full order items (tickets + upsellings, with names) for Customer.io
     const { data: fullOrderItems } = await supabaseClient
       .from("order_items")
       .select("*, ticket_types(name), upsellings(item)")
       .eq("order_id", orderId);
 
-    // Step 6: Send Slack notification if webhook is configured
     // Step 4.5: Update discount code usage if applicable
     await updateDiscountCodeUsage(orderId, supabaseClient);
 

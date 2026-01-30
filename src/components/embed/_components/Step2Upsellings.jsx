@@ -2,31 +2,36 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Row, Col, Form, Alert, Button } from 'react-bootstrap';
-import { AccruPay } from 'accru-pay-react';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { formatPhone } from '@src/components/global/Inputs/UniversalInput/_helpers/universalinput.events';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
+import { AccruPay } from 'accru-pay-react';
 import ordersAPI from '@src/api/orders.api';
 import paymentsAPI from '@src/api/payments.api';
 import formsAPI from '@src/api/forms.api';
-import storageAPI from '@src/api/storage.api';
-import CreditCardForm from './CreditCardForm';
 import OrderSummary from './OrderSummary';
+import EmbedUpsellingsList from './EmbedUpsellingsList';
+import CreditCardForm from './CreditCardForm';
 import {
   handleUpsellingChange,
   handleUpsellingCustomFieldChange,
   handleFieldChange,
-  handlePaymentSuccess,
   handleFreeOrderComplete,
   getUpsellingDiscountAmount,
+  goToOrderConfirmation,
+  handlePaymentSuccess,
 } from '../_helpers/eventForm.events';
 
-function Step2Upsellings({ onGoBack }) {
+function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByParent = false }) {
   const [searchParams] = useSearchParams();
-  const { form, upsellings, formData } = $embed.value;
-  const { selectedTickets, selectedUpsellings, upsellingCustomFields, order, paymentSession } = $embed.value;
+  const { form, upsellings, formData, paymentSession } = $embed.value;
+  const { selectedTickets, selectedUpsellings, upsellingCustomFields, order } = $embed.value;
+  const confirmationUrlOverride = searchParams.get('confirmationUrl');
+  const providers = paymentSession?.preSessionData
+    ? [{ name: 'nuvei', config: paymentSession.preSessionData }]
+    : null;
 
   const requestPhone = form?.request_phone_number === true;
   const requestPreference = form?.request_communication_preference === true;
@@ -38,26 +43,12 @@ function Step2Upsellings({ onGoBack }) {
 
   const orderTotal = order != null ? parseFloat(order.total) : null;
   const isFreeOrder = orderTotal !== null && orderTotal <= 0;
+  const showPaymentForm = !paymentFormRenderedByParent && order && paymentSession?.sessionToken && !isFreeOrder && order.status === 'PENDING' && parseFloat(order?.total) > 0;
 
   const [paymentError, setPaymentError] = useState(null);
   const [isCompletingFree, setIsCompletingFree] = useState(false);
   const [upsellingsTimerRemaining, setUpsellingsTimerRemaining] = useState(50);
   const [upsellingsSectionDismissed, setUpsellingsSectionDismissed] = useState(false);
-  const [signedImageUrls, setSignedImageUrls] = useState({});
-  const [failedImageUrls, setFailedImageUrls] = useState({});
-  const [carouselIndexByUpsellingId, setCarouselIndexByUpsellingId] = useState({});
-  const [hoverPreview, setHoverPreview] = useState(null);
-
-  const confirmationUrlOverride = searchParams.get('confirmationUrl');
-
-  const providers = paymentSession?.preSessionData
-    ? [
-      {
-        name: 'nuvei',
-        config: paymentSession.preSessionData,
-      },
-    ]
-    : null;
 
   const ticketsKey = JSON.stringify(selectedTickets || {});
   useEffectAsync(async () => {
@@ -82,7 +73,9 @@ function Step2Upsellings({ onGoBack }) {
     }
   }, [ticketsKey]);
 
-  // When order total becomes > 0 (e.g. user added upsellings) and we have no session yet, create one
+  // Create payment session only once per order. Nuvei does not allow creating a second
+  // session with the same merchantInternalTransactionCode (order.id), so we do not
+  // re-create when the order total changes (e.g. after adding upsellings).
   useEffectAsync(async () => {
     const { order: currentOrder, paymentSession: currentSession } = $embed.value;
     if (!currentOrder || currentOrder.status === 'PAID') return;
@@ -137,38 +130,6 @@ function Step2Upsellings({ onGoBack }) {
   }, [order?.form_submission_id, contactPrefsKey, schemaKeys]);
 
   const preCheckoutUpsellingsList = upsellings?.filter((u) => u.upselling_strategy === 'PRE-CHECKOUT') ?? [];
-
-  // Signed URLs for all upselling images (carousel + hover)
-  const embedImageUrlsKey = (preCheckoutUpsellingsList || [])
-    .flatMap((u) => (Array.isArray(u?.images) ? u.images : []))
-    .filter((url) => url && typeof url === 'string')
-    .filter((url, i, arr) => arr.indexOf(url) === i)
-    .join(',');
-  useEffect(() => {
-    if (!embedImageUrlsKey) {
-      setSignedImageUrls({});
-      setFailedImageUrls({});
-      return undefined;
-    }
-    setFailedImageUrls({});
-    let cancelled = false;
-    const allUrls = embedImageUrlsKey.split(',').filter(Boolean);
-    const uniqueUrlsToSign = [...new Set(allUrls)].filter((url) => url.includes('upselling-images'));
-    Promise.all(
-      uniqueUrlsToSign.map(async (url) => {
-        try {
-          const signed = await storageAPI.getSignedUpsellingImageUrl(url);
-          return [url, signed];
-        } catch {
-          return [url, url];
-        }
-      }),
-    ).then((pairs) => {
-      if (cancelled) return;
-      setSignedImageUrls(Object.fromEntries(pairs));
-    });
-    return () => { cancelled = true; };
-  }, [embedImageUrlsKey]);
 
   useEffect(() => {
     if (preCheckoutUpsellingsList.length === 0 || upsellingsSectionDismissed) {
@@ -281,31 +242,6 @@ function Step2Upsellings({ onGoBack }) {
     );
   };
 
-  const renderUpsellingCustomField = (field, upsellingId, unitIndex, index) => {
-    const unitValues = upsellingCustomFields[upsellingId];
-    const isArray = Array.isArray(unitValues);
-    const value = isArray && unitValues[unitIndex]
-      ? (unitValues[unitIndex][field.label] ?? '')
-      : !isArray && unitValues
-        ? (unitValues[field.label] ?? '')
-        : '';
-    const fieldKey = `${upsellingId}_${unitIndex}_${field.label}`;
-
-    return (
-      <FormDynamicField
-        key={fieldKey}
-        field={field}
-        index={index}
-        name={fieldKey}
-        value={value}
-        groupClassName="mb-16"
-        labelClassName="small"
-        selectPlaceholder={field.placeholder || 'Select...'}
-        onChange={(newValue) => handleUpsellingCustomFieldChange(upsellingId, unitIndex, field.label, newValue)}
-      />
-    );
-  };
-
   const preCheckoutUpsellings = upsellings.filter(u => u.upselling_strategy === 'PRE-CHECKOUT');
   const showUpsellingsSection = preCheckoutUpsellings.length > 0 && !upsellingsSectionDismissed;
 
@@ -339,215 +275,15 @@ function Step2Upsellings({ onGoBack }) {
             </div>
           </div>
 
-          {preCheckoutUpsellings.map((upselling, index) => {
-            const imageList = Array.isArray(upselling?.images) ? upselling.images : [];
-            const firstImageUrl = imageList[0];
-            const currentCarouselIndex = Math.min(
-              carouselIndexByUpsellingId[upselling.id] ?? 0,
-              Math.max(0, imageList.length - 1),
-            );
-            const currentImageUrl = imageList[currentCarouselIndex] ?? firstImageUrl;
-            const available = upselling.quantity - (upselling.sold || 0);
-            const selectedQty = selectedUpsellings[upselling.id] || 0;
-            const hasCustomFields = upselling.custom_fields && upselling.custom_fields.length > 0;
-            const isSelected = selectedQty > 0;
-            const isOnlyOne = upselling.quantity_rule === 'ONLY_ONE';
-            const matchesTicketCount = upselling.quantity_rule === 'MATCHES_TICKET_COUNT';
-
-            let maxQuantity = available;
-            if (isOnlyOne) {
-              maxQuantity = Math.min(1, available);
-            } else if (matchesTicketCount) {
-              maxQuantity = Math.min(totalTicketsSelected, available);
-            }
-
-            let quantityOptions;
-            if (isOnlyOne) {
-              quantityOptions = maxQuantity > 0 ? [0, 1] : [0];
-            } else if (matchesTicketCount) {
-              if (maxQuantity <= 0) {
-                quantityOptions = [0];
-              } else {
-                quantityOptions = [0, maxQuantity];
-              }
-            } else {
-              quantityOptions = [...Array(maxQuantity + 1).keys()];
-            }
-
-            return (
-              <Card key={upselling.id} className={`mb-16 border-0 ${isSelected ? 'selected' : ''} ${available === 0 ? 'sold-out' : ''}`} style={{ animationDelay: `${index * 0.1}s` }}>
-                <Card.Body className="p-24">
-                  <Row className="align-items-center">
-                    <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
-                      <div className="d-flex align-items-start">
-                        <div
-                          className="me-20 flex-shrink-0 position-relative"
-                          onMouseEnter={() => {
-                            if (!firstImageUrl) return;
-                            const url = imageList[currentCarouselIndex];
-                            const displayUrl = failedImageUrls[url] ? url : (signedImageUrls[url] ?? url);
-                            setHoverPreview({ upsellingId: upselling.id, imageUrl: displayUrl });
-                          }}
-                          onMouseLeave={() => setHoverPreview(null)}
-                        >
-                          {firstImageUrl ? (
-                            <>
-                              {hoverPreview?.upsellingId === upselling.id && (
-                                <div
-                                  className="position-absolute start-50 translate-middle-x rounded overflow-hidden bg-white border shadow"
-                                  style={{
-                                    top: '100%',
-                                    marginTop: 8,
-                                    marginLeft: 100,
-                                    width: 280,
-                                    height: 280,
-                                    zIndex: 10,
-                                  }}
-                                >
-                                  <img
-                                    src={hoverPreview.imageUrl}
-                                    alt=""
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'contain',
-                                      imageOrientation: 'from-image',
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              <div
-                                className="position-relative rounded overflow-hidden d-flex align-items-center"
-                                style={{ width: 96, height: 96 }}
-                              >
-                                {imageList.length > 1 && (
-                                  <button
-                                    type="button"
-                                    aria-label="Previous image"
-                                    className="position-absolute start-0 top-50 translate-middle-y border-0 rounded-end d-flex align-items-center justify-content-center text-white bg-dark bg-opacity-50"
-                                    style={{ width: 28, height: 36, zIndex: 2 }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setCarouselIndexByUpsellingId((prev) => ({
-                                        ...prev,
-                                        [upselling.id]: currentCarouselIndex <= 0 ? imageList.length - 1 : currentCarouselIndex - 1,
-                                      }));
-                                    }}
-                                  >
-                                    ‹
-                                  </button>
-                                )}
-                                <img
-                                  key={currentImageUrl}
-                                  src={failedImageUrls[currentImageUrl] ? currentImageUrl : (signedImageUrls[currentImageUrl] ?? currentImageUrl)}
-                                  alt=""
-                                  loading="lazy"
-                                  style={{
-                                    width: 96,
-                                    height: 96,
-                                    objectFit: 'cover',
-                                    imageOrientation: 'from-image',
-                                  }}
-                                  onError={() => setFailedImageUrls((prev) => ({ ...prev, [currentImageUrl]: true }))}
-                                />
-                                {imageList.length > 1 && (
-                                  <button
-                                    type="button"
-                                    aria-label="Next image"
-                                    className="position-absolute end-0 top-50 translate-middle-y border-0 rounded-start d-flex align-items-center justify-content-center text-white bg-dark bg-opacity-50"
-                                    style={{ width: 28, height: 36, zIndex: 2 }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setCarouselIndexByUpsellingId((prev) => ({
-                                        ...prev,
-                                        [upselling.id]: currentCarouselIndex >= imageList.length - 1 ? 0 : currentCarouselIndex + 1,
-                                      }));
-                                    }}
-                                  >
-                                    ›
-                                  </button>
-                                )}
-                              </div>
-                              {imageList.length > 1 && (
-                                <div className="text-center text-muted small mt-8">
-                                  {currentCarouselIndex + 1} / {imageList.length}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center bg-light text-muted"
-                              style={{ width: 96, height: 96, fontSize: 24 }}
-                              aria-hidden
-                            >
-                              —
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-grow-1">
-                          <h6 className="mb-8">{upselling.item ?? upselling.name}</h6>
-                          {upselling.description && (
-                            <p className="text-muted small mb-8">{upselling.description}</p>
-                          )}
-                          {upselling.benefits && (
-                            <div className="mb-8">
-                              <span className="benefits-label">Benefits:</span>
-                              <span className="benefits-text">{upselling.benefits}</span>
-                            </div>
-                          )}
-                          <div>
-                            <span className="price-currency">$</span>
-                            <span className="price-amount">{parseFloat(upselling.amount ?? upselling.price).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </Col>
-                    <Col md={3}>
-                      <Form.Label className="small fw-semibold mb-8">Quantity</Form.Label>
-                      <UniversalInput
-                        as="select"
-                        name={`upselling_${upselling.id}`}
-                        value={selectedQty}
-                        customOnChange={e => handleUpsellingChange(upselling.id, Number(e.target.value))}
-                        disabled={available === 0}
-                      >
-                        {quantityOptions.map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </UniversalInput>
-                      {selectedQty > 0 && (
-                        <div className="mt-8">
-                          <small className="text-muted">Subtotal: </small>
-                          <strong className="text-primary">
-                            ${(parseFloat(upselling.amount ?? upselling.price) * selectedQty).toFixed(2)}
-                          </strong>
-                        </div>
-                      )}
-                    </Col>
-                  </Row>
-                  {selectedQty > 0 && hasCustomFields && (
-                    <Row className="mt-16">
-                      <Col md={12}>
-                        <div className="border-top pt-16 mt-16">
-                          <h6 className="small mb-16 fw-semibold">Additional Information</h6>
-                          {Array.from({ length: selectedQty }, (_, unitIndex) => (
-                            <div key={`${upselling.id}_unit_${unitIndex}`} className="mb-24">
-                              {selectedQty > 1 && (
-                                <div className="small fw-semibold text-muted mb-8">
-                                  {upselling.item ?? upselling.name} #{unitIndex + 1}
-                                </div>
-                              )}
-                              {upselling.custom_fields.map((field, idx) => renderUpsellingCustomField(field, upselling.id, unitIndex, idx))}
-                            </div>
-                          ))}
-                        </div>
-                      </Col>
-                    </Row>
-                  )}
-                </Card.Body>
-              </Card>
-            );
-          })}
+          <EmbedUpsellingsList
+            upsellings={preCheckoutUpsellings}
+            selectedUpsellings={selectedUpsellings || {}}
+            onUpsellingChange={handleUpsellingChange}
+            upsellingCustomFields={upsellingCustomFields || {}}
+            onUpsellingCustomFieldChange={handleUpsellingCustomFieldChange}
+            totalTicketsSelected={totalTicketsSelected}
+            form={form}
+          />
         </>
       )}
 
@@ -634,7 +370,8 @@ function Step2Upsellings({ onGoBack }) {
                   try {
                     setIsCompletingFree(true);
                     setPaymentError(null);
-                    await handleFreeOrderComplete(confirmationUrlOverride);
+                    await handleFreeOrderComplete(confirmationUrlOverride, { skipRedirect: !!onCompletePayment });
+                    if (onCompletePayment) onCompletePayment();
                   } catch (err) {
                     setPaymentError(err.message || 'Unable to complete order. Please try again.');
                   } finally {
@@ -648,14 +385,10 @@ function Step2Upsellings({ onGoBack }) {
           </Card>
         )}
 
-        {order && !isFreeOrder && providers && paymentSession && (
-          <Card>
-            <Card.Body>
-              {showExtraFields && !isContactPreferencesValid && (
-                <Alert variant="warning" className="mb-16">
-                  Please select how you would like to be contacted before completing your order.
-                </Alert>
-              )}
+        {showPaymentForm && providers && (
+          <Card className="mt-32 border-0">
+            <Card.Body className="p-24">
+              <h5 className="mb-24">Payment Information</h5>
               <AccruPay
                 sessionToken={paymentSession.sessionToken}
                 preferredProvider="nuvei"
@@ -663,16 +396,21 @@ function Step2Upsellings({ onGoBack }) {
               >
                 <CreditCardForm
                   order={order}
-                  submitDisabled={showExtraFields && !isContactPreferencesValid}
                   onPaymentSuccess={async (paymentData) => {
-                    try {
-                      await handlePaymentSuccess(paymentData, confirmationUrlOverride);
-                    } catch (err) {
-                      setPaymentError(err.message || 'Error processing payment. Please try again.');
+                    await handlePaymentSuccess(paymentData, confirmationUrlOverride, { skipRedirect: true });
+                    if (onCompletePayment) {
+                      onCompletePayment();
+                    } else {
+                      goToOrderConfirmation(confirmationUrlOverride);
                     }
                   }}
                 />
               </AccruPay>
+              {paymentError && (
+                <Alert variant="danger" className="mt-16 mb-0">
+                  {paymentError}
+                </Alert>
+              )}
             </Card.Body>
           </Card>
         )}

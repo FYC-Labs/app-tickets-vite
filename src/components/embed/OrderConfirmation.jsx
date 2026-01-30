@@ -4,7 +4,6 @@ import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { Signal } from '@fyclabs/tools-fyc-react/signals';
 import ordersAPI from '@src/api/orders.api';
 import Loader from '@src/components/global/Loader';
-import PostCheckoutUpsellings from './_components/PostCheckoutUpsellings';
 import * as checkoutResolvers from './_helpers/checkout.resolvers';
 
 const $orderConfirmation = Signal({
@@ -156,7 +155,6 @@ function OrderConfirmation() {
         </Button>
       </div>
 
-      <PostCheckoutUpsellings order={order} />
     </Container>
   );
 }

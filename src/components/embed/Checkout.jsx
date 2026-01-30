@@ -11,7 +11,7 @@ import CreditCardForm from './_components/CreditCardForm';
 import OrderSummary from './_components/OrderSummary';
 import PaymentStatus from './_components/PaymentStatus';
 import TestCards from './_components/TestCards';
-import PostCheckoutUpsellings from './_components/PostCheckoutUpsellings';
+// import PostCheckoutUpsellings from './_components/PostCheckoutUpsellings';
 
 const PAYMENT_PROCESSOR = 'nuvei';
 
@@ -101,7 +101,7 @@ function Checkout() {
           <p>Your order has been successfully paid. Thank you for your purchase!</p>
         </Alert>
         <OrderSummary order={order} />
-        <PostCheckoutUpsellings order={order} />
+        {/* <PostCheckoutUpsellings order={order} /> */}
       </Container>
     );
   }

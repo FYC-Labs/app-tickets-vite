@@ -12,8 +12,7 @@ import {
 } from '../_helpers/eventForm.events';
 
 function Step1Checkout({ formId, eventId, onPlaceOrder }) {
-  const { form } = $embed.value;
-  const { tickets } = $embed.value;
+  const { form, tickets, order } = $embed.value;
   const {
     error,
     formData,
@@ -39,26 +38,21 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
       setIsPlacingOrder(true);
       setLocalError(null);
 
-      const order = await createOrderForPayment(formId, eventId);
-      if (!order) {
+      const newOrder = await createOrderForPayment(formId, eventId);
+      if (!newOrder) {
         setLocalError('Unable to create order. Please try again.');
         return;
       }
 
-      const orderTotal = parseFloat(order.total);
-      if (orderTotal > 0) {
-        const session = await paymentsAPI.createPaymentSession(order.id);
-        if (!session || !session.sessionToken) {
-          setLocalError('Payment session could not be initialized. Please try again.');
-          return;
+      if (parseFloat(newOrder.total) > 0) {
+        const session = await paymentsAPI.createPaymentSession(newOrder.id);
+        if (session?.sessionToken) {
+          $embed.update({ paymentSession: session });
         }
-        $embed.update({ paymentSession: session });
-      } else {
-        $embed.update({ paymentSession: null });
       }
 
-      if (onPlaceOrder) {
-        onPlaceOrder();
+      if (parseFloat(newOrder.total) <= 0) {
+        if (onPlaceOrder) onPlaceOrder();
       }
     } catch (err) {
       setLocalError(err.message || 'Error creating order. Please try again.');
@@ -232,17 +226,23 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
           </div>
         )}
 
-        {/* Paso 1: Place Order crea la orden base y avanza el flujo */}
-        <Button
-          type="button"
-          variant="dark"
-          size="lg"
-          className="w-100"
-          disabled={isPlacingOrder || !isFormValid || !hasContactInfo || !hasTicketsSelected}
-          onClick={handlePlaceOrderClick}
-        >
-          {isPlacingOrder ? 'Preparing order...' : 'Place Order'}
-        </Button>
+        {!order && (
+          <Button
+            type="button"
+            variant="dark"
+            size="lg"
+            className="w-100"
+            disabled={isPlacingOrder || !isFormValid || !hasContactInfo || !hasTicketsSelected}
+            onClick={handlePlaceOrderClick}
+          >
+            {isPlacingOrder ? 'Preparing order...' : 'Place Order'}
+          </Button>
+        )}
+        {order && (
+          <p className="text-muted mb-0 small">
+            Enter your payment details below — you won&apos;t be charged until you complete the next step.
+          </p>
+        )}
       </Form>
     </>
   );

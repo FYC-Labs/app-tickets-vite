@@ -34,7 +34,7 @@ export async function createPaymentSession(
   orderId: string,
   supabaseClient: any,
   accruPayClients: { production: any; sandbox: any },
-  envTag: string
+  envTag: string,
 ): Promise<PaymentSessionResult> {
   // Get order details - explicit select to avoid relationship ambiguity
   const { data: order, error: orderError } = await supabaseClient
@@ -102,7 +102,6 @@ export async function createPaymentSession(
 
   // Create payment session with Accrupay/Nuvei
   try {
-    // Convert amount to bigint (cents)
     const amountInCents = Math.round(parseFloat(order.total) * 100);
 
     console.log("[ACCRUPAY][createPaymentSession] Creating client session", {

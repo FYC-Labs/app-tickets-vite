@@ -220,6 +220,50 @@ async function updateDiscountCodeUsage(orderId: string, supabaseClient: any) {
 }
 
 /**
+ * Runs post-payment steps: inventory, upsellings sold, discount usage, Slack, email.
+ */
+export async function runPostPaymentSteps(
+  orderId: string,
+  order: { events?: { slack_webhook_url?: string } },
+  supabaseClient: any,
+) {
+  await updateTicketInventory(orderId, supabaseClient);
+  await updateUpsellingSold(orderId, supabaseClient);
+
+  const { data: fullOrderItems } = await supabaseClient
+    .from("order_items")
+    .select("*, ticket_types(name), upsellings(item)")
+    .eq("order_id", orderId);
+
+  await updateDiscountCodeUsage(orderId, supabaseClient);
+
+  const slackWebhookUrl = order.events?.slack_webhook_url;
+  if (slackWebhookUrl) {
+    const { data: fullOrder } = await supabaseClient
+      .from("orders")
+      .select(
+        "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
+      )
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (fullOrder) {
+      sendSlackNotification(slackWebhookUrl, fullOrder).catch((error) => {
+        console.warn("Failed to send Slack notification:", error);
+      });
+    }
+  }
+
+  console.log("[Customer.io] Sending confirmation email", fullOrderItems);
+  const triggerData = await sendConfirmationEmail(
+    orderId,
+    fullOrderItems ?? [],
+    supabaseClient,
+  );
+  return triggerData;
+}
+
+/**
  * Fetches event and order data for email
  */
 async function getEventAndOrderData(orderId: string, supabaseClient: any) {
@@ -720,50 +764,8 @@ export async function confirmPayment(
       paymentMethodId,
     );
 
-    // Step 4: Update ticket inventory
-    await updateTicketInventory(orderId, supabaseClient);
-
-    // Step 4.2: Update upselling sold count
-    await updateUpsellingSold(orderId, supabaseClient);
-
-    // Step 5: Fetch full order items (tickets + upsellings, with names) for Customer.io
-    const { data: fullOrderItems } = await supabaseClient
-      .from("order_items")
-      .select("*, ticket_types(name), upsellings(item)")
-      .eq("order_id", orderId);
-
-    // Step 4.5: Update discount code usage if applicable
-    await updateDiscountCodeUsage(orderId, supabaseClient);
-
-    // Step 5: Send Slack notification if webhook is configured
-    const slackWebhookUrl = order.events?.slack_webhook_url;
-    if (slackWebhookUrl) {
-      // Fetch full order data with event and order items for Slack notification
-      const { data: fullOrder } = await supabaseClient
-        .from("orders")
-        .select(
-          "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
-        )
-        .eq("id", orderId)
-        .maybeSingle();
-
-      if (fullOrder) {
-        sendSlackNotification(slackWebhookUrl, fullOrder).catch((error) => {
-          console.warn(
-            "Failed to send Slack notification on payment confirmation:",
-            error,
-          );
-        });
-      }
-    }
-
-    // Step 7: Send confirmation email (with full order items: tickets, upsellings, custom_fields)
-    console.log("[Customer.io][confirmPayment] Sending confirmation email", fullOrderItems);
-    const triggerData = await sendConfirmationEmail(
-      orderId,
-      fullOrderItems ?? [],
-      supabaseClient,
-    );
+    // Step 4–7: inventory, upsellings sold, discount usage, Slack, email
+    const triggerData = await runPostPaymentSteps(orderId, order, supabaseClient);
 
     return {
       data: {

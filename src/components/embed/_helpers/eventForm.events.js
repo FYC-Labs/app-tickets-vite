@@ -518,7 +518,9 @@ const buildConfirmationUrl = (baseUrl, order) => {
   return url.toString();
 };
 
-export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride = null) => {
+export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride = null, options = {}) => {
+  const { skipRedirect = false } = options;
+
   try {
     $embed.update({ error: null });
 
@@ -532,6 +534,10 @@ export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride 
 
     const updatedOrder = await ordersAPI.getById(order.id);
     $embed.update({ order: updatedOrder });
+
+    if (skipRedirect) {
+      return updatedOrder;
+    }
 
     let redirectUrl;
 
@@ -585,6 +591,8 @@ export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride 
     setTimeout(() => {
       window.location.href = redirectUrl;
     }, isInIframe ? 1000 : 2000);
+
+    return updatedOrder;
   } catch (err) {
     const errorMessage = err.message || 'Payment confirmation failed. Please contact support if you were charged.';
     $embed.update({
@@ -594,8 +602,45 @@ export const handlePaymentSuccess = async (paymentData, confirmationUrlOverride 
   }
 };
 
-/** Completes a free order (total <= 0) without payment, then redirects to confirmation. */
-export const handleFreeOrderComplete = async (confirmationUrlOverride = null) => {
+/** Navigate to order confirmation (used after payment success in step 2 or 3). */
+export const goToOrderConfirmation = (confirmationUrlOverride = null, orderOverride = null) => {
+  const { order: embedOrder, form } = $embed.value;
+  const order = orderOverride ?? embedOrder;
+  if (!order) return;
+  const hasOverride = confirmationUrlOverride && typeof confirmationUrlOverride === 'string' && confirmationUrlOverride.trim() !== '';
+  const hasFormUrl = form?.order_confirmation_url && typeof form.order_confirmation_url === 'string' && form.order_confirmation_url.trim() !== '';
+  const base = hasOverride ? confirmationUrlOverride : (hasFormUrl ? form.order_confirmation_url : `/embed/order-confirmation/${order.id}`);
+  const redirectUrl = buildConfirmationUrl(base, order);
+  const orderDetails = {
+    orderId: order.id,
+    customerEmail: order.customer_email || '',
+    customerName: order.customer_name || '',
+    total: order.total?.toString() || '0',
+    subtotal: order.subtotal?.toString() || '0',
+    discountAmount: order.discount_amount?.toString() || '0',
+    status: order.status || '',
+    eventTitle: order.events?.title || '',
+    orderItems: order.order_items?.map(item => ({
+      ticketTypeName: item.ticket_types?.name || item.upsellings?.item || '',
+      quantity: item.quantity,
+      unitPrice: item.unit_price?.toString() || '0',
+      subtotal: item.subtotal?.toString() || '0',
+    })) || [],
+  };
+  const isInIframe = window.parent && window.parent !== window;
+  if (isInIframe) {
+    window.parent.postMessage({
+      type: 'order-complete',
+      redirectUrl,
+      orderDetails,
+      order,
+    }, '*');
+  }
+  window.location.href = redirectUrl;
+};
+
+/** Completes a free order (total <= 0) without payment, then redirects to confirmation (unless options.skipRedirect). */
+export const handleFreeOrderComplete = async (confirmationUrlOverride = null, options = {}) => {
   try {
     $embed.update({ error: null });
 
@@ -609,6 +654,10 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null) =>
 
     const updatedOrder = await ordersAPI.getById(order.id);
     $embed.update({ order: updatedOrder });
+
+    if (options.skipRedirect) {
+      return;
+    }
 
     let redirectUrl;
 

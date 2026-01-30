@@ -370,8 +370,8 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
                   try {
                     setIsCompletingFree(true);
                     setPaymentError(null);
-                    await handleFreeOrderComplete(confirmationUrlOverride, { skipRedirect: !!onCompletePayment });
-                    if (onCompletePayment) onCompletePayment();
+                    // For free orders, redirect directly to confirmation (don't go to step 3)
+                    await handleFreeOrderComplete(confirmationUrlOverride);
                   } catch (err) {
                     setPaymentError(err.message || 'Unable to complete order. Please try again.');
                   } finally {

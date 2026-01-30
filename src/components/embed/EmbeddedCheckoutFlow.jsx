@@ -5,6 +5,7 @@ import { AccruPay } from 'accru-pay-react';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import Loader from '@src/components/global/Loader';
+import paymentsAPI from '@src/api/payments.api';
 import { postCheckoutUpsellings } from './_helpers/checkout.consts';
 import { loadPostCheckoutUpsellings } from './_helpers/checkout.resolvers';
 import { loadFormData } from './_helpers/eventForm.events';
@@ -69,6 +70,24 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
     }
   }, [currentStep, postCheckoutLoaded, hasPostCheckoutUpsellings]);
 
+  // Create payment session when order total becomes > 0 in step 2 or 3
+  // This handles the case where order starts at $0 (100% discount) but upsellings are added
+  useEffectAsync(async () => {
+    if (currentStep !== 2 && currentStep !== 3) return;
+    if (!order || order.status === 'PAID') return;
+    if (orderTotal <= 0) return;
+    if (paymentSession?.sessionToken) return;
+
+    try {
+      const session = await paymentsAPI.createPaymentSession(order.id);
+      if (session?.sessionToken) {
+        $embed.update({ paymentSession: session });
+      }
+    } catch {
+      // Session creation can fail; paymentError will show when user tries to pay
+    }
+  }, [currentStep, order?.id, order?.status, orderTotal, paymentSession?.sessionToken]);
+
   if (isLoading) {
     return (
       <div className="min-vh-100 w-100 d-flex justify-content-center align-items-center">
@@ -112,7 +131,11 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
             >
               <CreditCardForm
                 order={order}
-                showCardFields={currentStep === 1}
+                showCardFields={
+                  // Show fields in step 1 always, or in step 2/3 when there's a payment session
+                  // (e.g., when order total becomes > 0 after adding upsellings to a 100% discount)
+                  currentStep === 1 || (paymentSession?.sessionToken && orderTotal > 0)
+                }
                 showSubmitButton={
                   // Show button in step 2 if no post-checkout upsellings
                   // OR in step 3 if there are post-checkout upsellings

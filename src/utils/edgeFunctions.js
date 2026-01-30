@@ -72,13 +72,21 @@ export async function callEdgeFunction(functionName, options = {}) {
       if (response.status === 404) {
         errorMessage = 'Resource not found';
       } else if (response.status === 500) {
-        errorMessage = 'Server error. Please try again later.';
+        // Use the server's error message if available, otherwise use generic message
+        errorMessage = data.error || data.message || 'Server error. Please try again later.';
+        console.error('Server error details:', {
+          status: response.status,
+          error: data.error,
+          message: data.message,
+          data,
+        });
       } else if (response.status === 401 || response.status === 403) {
         errorMessage = 'Authentication error. Please refresh the page.';
       }
 
       const error = new Error(errorMessage);
       error.status = response.status;
+      error.originalData = data;
       throw error;
     }
 

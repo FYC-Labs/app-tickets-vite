@@ -267,94 +267,108 @@ export async function runPostPaymentSteps(
  * Fetches event and order data for email
  */
 async function getEventAndOrderData(orderId: string, supabaseClient: any) {
-  const { data: eventData, error } = await supabaseClient
-    .from("orders")
-    .select(
-      `
-      event_id,
-      form_submission_id,
-      customer_name,
-      customer_email,
-      customer_first_name,
-      customer_last_name,
-      customer_phone,
-      billing_address,
-      billing_address_2,
-      billing_city,
-      billing_state,
-      billing_zip,
-      created_at,
-      payment_intent_id,
-      total,
-      subtotal,
-      discount_amount,
-      discount_code_id,
-      status,
-      events!inner (
-        title,
-        start_date,
-        end_date,
-        location,
-        customerio_app_api_key,
-        customerio_transactional_template_id,
-        customerio_site_id,
-        customerio_track_api_key,
-        customerio_custom_attribute_key,
-        customerio_custom_attribute_value
+  try {
+    const { data: eventData, error } = await supabaseClient
+      .from("orders")
+      .select(
+        `
+        event_id,
+        form_submission_id,
+        customer_name,
+        customer_email,
+        customer_first_name,
+        customer_last_name,
+        customer_phone,
+        billing_address,
+        billing_address_2,
+        billing_city,
+        billing_state,
+        billing_zip,
+        created_at,
+        payment_intent_id,
+        total,
+        subtotal,
+        discount_amount,
+        discount_code_id,
+        status,
+        events!inner (
+          title,
+          start_date,
+          end_date,
+          location,
+          customerio_app_api_key,
+          customerio_transactional_template_id,
+          customerio_site_id,
+          customerio_track_api_key,
+          customerio_custom_attribute_key,
+          customerio_custom_attribute_value
+        )
+      `,
       )
-    `,
-    )
-    .eq("id", orderId)
-    .single();
+      .eq("id", orderId)
+      .maybeSingle();
 
-  if (error) {
-    console.error("Error fetching event and order data for email:", {
+    if (error) {
+      console.error("Error fetching event and order data for email:", {
+        orderId,
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      return null;
+    }
+
+    if (!eventData) {
+      console.warn("No event data found for order:", orderId);
+      return null;
+    }
+
+    if (!eventData) {
+      console.warn("No event data found for order:", orderId);
+      return null;
+    }
+
+    // Fetch form_submissions separately to avoid relationship ambiguity
+    let formSubmission = null;
+    
+    if (eventData.form_submission_id) {
+      const { data: submission, error: submissionError } = await supabaseClient
+        .from("form_submissions")
+        .select("responses")
+        .eq("id", eventData.form_submission_id)
+        .maybeSingle();
+
+      if (!submissionError && submission) {
+        formSubmission = submission;
+      }
+    }
+
+    // If not found via form_submission_id, try via order_id
+    if (!formSubmission) {
+      const { data: submission, error: submissionError } = await supabaseClient
+        .from("form_submissions")
+        .select("responses")
+        .eq("order_id", orderId)
+        .maybeSingle();
+
+      if (!submissionError && submission) {
+        formSubmission = submission;
+      }
+    }
+
+    // Attach form_submission to eventData for consistency
+    eventData.form_submissions = formSubmission;
+
+    return eventData;
+  } catch (err: any) {
+    console.error("Unexpected error in getEventAndOrderData:", {
       orderId,
-      error: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
+      error: err.message,
+      stack: err.stack,
     });
     return null;
   }
-
-  if (!eventData) {
-    console.warn("No event data found for order:", orderId);
-    return null;
-  }
-
-  // Fetch form_submissions separately to avoid relationship ambiguity
-  let formSubmission = null;
-  
-  if (eventData.form_submission_id) {
-    const { data: submission, error: submissionError } = await supabaseClient
-      .from("form_submissions")
-      .select("responses")
-      .eq("id", eventData.form_submission_id)
-      .maybeSingle();
-
-    if (!submissionError && submission) {
-      formSubmission = submission;
-    }
-  }
-
-  // If not found via form_submission_id, try via order_id
-  if (!formSubmission) {
-    const { data: submission, error: submissionError } = await supabaseClient
-      .from("form_submissions")
-      .select("responses")
-      .eq("order_id", orderId)
-      .maybeSingle();
-
-    if (!submissionError && submission) {
-      formSubmission = submission;
-    }
-  }
-
-  // Attach form_submission to eventData for consistency
-  eventData.form_submissions = formSubmission;
-
-  return eventData;
 }
 
 /** Normalize one order item for Customer.io (ticket or upselling, plus custom_fields when present) */

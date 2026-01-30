@@ -650,9 +650,20 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null, op
       throw new Error('Order not found');
     }
 
-    await paymentsAPI.confirmFreePayment(order.id);
+    try {
+      await paymentsAPI.confirmFreePayment(order.id);
+    } catch (paymentError) {
+      console.error('Error confirming free payment:', paymentError);
+      // Re-throw with more context
+      throw new Error(
+        paymentError.message || 'Failed to confirm free payment. Please try again.'
+      );
+    }
 
     const updatedOrder = await ordersAPI.getById(order.id);
+    if (!updatedOrder) {
+      throw new Error('Order not found after confirmation');
+    }
     $embed.update({ order: updatedOrder });
 
     if (options.skipRedirect) {

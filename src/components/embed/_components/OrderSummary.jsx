@@ -24,7 +24,6 @@ function OrderSummary({ order }) {
         <div className="mb-24">
           <strong>Items:</strong>
           {order.order_items?.map((item, index) => {
-            // 1) Prefer relaciones que vienen del backend (checkout clásico)
             if (item.upsellings) {
               const name = item.upsellings.item ?? item.upsellings.name ?? 'Upselling';
               return (
@@ -49,7 +48,6 @@ function OrderSummary({ order }) {
               );
             }
 
-            // 2) Flujo embed: order_items solo trae ids, buscamos en señales locales
             if (item.upselling_id) {
               const upselling = upsellings.find((u) => u.id === item.upselling_id);
               const name = upselling?.item ?? upselling?.name ?? 'Upselling';
@@ -76,7 +74,6 @@ function OrderSummary({ order }) {
               );
             }
 
-            // Fallback ultra defensivo
             return (
               <div key={index} className="d-flex justify-content-between mt-8">
                 <span>

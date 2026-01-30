@@ -156,8 +156,16 @@ function PostCheckoutUpsellings({ order }) {
                     <Row className="align-items-start">
                       <Col md={8}>
                         <div className="d-flex align-items-start mb-16">
-                          <div className="me-16">
-                            <span className="icon-sparkle">⭐</span>
+                          <div className="me-16 flex-shrink-0">
+                            {upselling.images?.length > 0 ? (
+                              <img
+                                src={upselling.images[0]}
+                                alt=""
+                                style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }}
+                              />
+                            ) : (
+                              <span className="icon-sparkle">⭐</span>
+                            )}
                           </div>
                           <div className="flex-grow-1">
                             <div className="d-flex align-items-center mb-8">

@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Table, Button, Form } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faPen, faTrash, faTimes, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { format } from 'date-fns';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
+import storageAPI from '@src/api/storage.api';
+import { showToast } from '@src/components/global/Alert/_helpers/alert.events';
 import {
   $formManagerForm,
   handleUpsellingSelection,
@@ -17,6 +19,8 @@ import {
   addCustomField,
   updateCustomField,
   removeCustomField,
+  addUpsellingImage,
+  removeUpsellingImage,
 } from '../../_helpers/upsellingsManager.events';
 
 const DISCOUNT_TYPES = {
@@ -59,8 +63,84 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
 
   const strategyLabel = (v) => (v === 'POST-CHECKOUT' ? 'Post-checkout' : 'Pre-checkout');
 
-  // eslint-disable-next-line no-console
-  console.debug('[FormEditModalUpsellingsTab] available_upselling_ids =', $formManagerForm.value.available_upselling_ids);
+  const [imagesUploading, setImagesUploading] = useState(false);
+  const [uploadingPreviews, setUploadingPreviews] = useState([]); // [{ file, objectUrl }]
+  const [signedImageUrls, setSignedImageUrls] = useState({}); // { publicUrl -> signedUrl }
+  const [failedImageUrls, setFailedImageUrls] = useState({}); // si falla la carga, probar URL pública
+  const imageInputRef = useRef(null);
+
+  // Obtener signed URLs para miniaturas (funciona con bucket público o privado)
+  const imageUrls = formData.images || [];
+  const imageUrlsKey = imageUrls.length ? imageUrls.join(',') : '';
+  useEffect(() => {
+    if (!imageUrlsKey) {
+      setSignedImageUrls({});
+      setFailedImageUrls({});
+      return undefined;
+    }
+    setFailedImageUrls({});
+    let cancelled = false;
+    const urlsToSign = imageUrls.filter((url) => url && url.includes('upselling-images'));
+    const fallbacks = Object.fromEntries((imageUrls.filter((url) => !url || !url.includes('upselling-images'))).map((url) => [url, url]));
+    Promise.all(
+      urlsToSign.map(async (url) => {
+        try {
+          const signed = await storageAPI.getSignedUpsellingImageUrl(url);
+          return [url, signed];
+        } catch {
+          return [url, url];
+        }
+      }),
+    ).then((pairs) => {
+      if (cancelled) return;
+      setSignedImageUrls({ ...fallbacks, ...Object.fromEntries(pairs) });
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- imageUrlsKey es la dependencia estable de la lista de URLs
+  }, [imageUrlsKey]);
+
+  const handleImageSelect = async (e) => {
+    const { files } = e.target;
+    if (!files?.length || !eventId) return;
+    const fileList = Array.from(files);
+    const previews = fileList.map((file) => ({
+      file,
+      objectUrl: URL.createObjectURL(file),
+    }));
+    setUploadingPreviews(previews);
+    setImagesUploading(true);
+    const folderId = $upsellingUI.value.editingUpselling?.id || 'new';
+    e.target.value = '';
+    try {
+      const urls = await Promise.all(
+        fileList.map((file) => storageAPI.uploadUpsellingImage(file, eventId, folderId)),
+      );
+      urls.forEach((url) => addUpsellingImage(url));
+      // Obtener signed URLs de las imágenes recién subidas para que la miniatura se vea de inmediato
+      const newSigned = await Promise.all(
+        urls.map(async (url) => {
+          try {
+            const signed = await storageAPI.getSignedUpsellingImageUrl(url);
+            return [url, signed];
+          } catch {
+            return [url, url];
+          }
+        }),
+      );
+      setSignedImageUrls((prev) => ({ ...prev, ...Object.fromEntries(newSigned) }));
+      setTimeout(() => {
+        previews.forEach((p) => URL.revokeObjectURL(p.objectUrl));
+        setUploadingPreviews([]);
+      }, 600);
+    } catch (err) {
+      const message = err?.message || err?.error_description || 'Error al subir la imagen';
+      showToast(message, 'error');
+      previews.forEach((p) => URL.revokeObjectURL(p.objectUrl));
+      setUploadingPreviews([]);
+    } finally {
+      setImagesUploading(false);
+    }
+  };
 
   return (
     <div>
@@ -361,6 +441,70 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
                     </td>
                   </tr>
                 )}
+                <tr className="inline-edit-images-row">
+                  <td colSpan={12} className="p-8">
+                    <div className="form-edit-custom-fields-label small mb-8">Images</div>
+                    <div className="d-flex flex-wrap gap-2 align-items-start mb-8">
+                      {(formData.images || []).map((url, idx) => {
+                        const displayUrl = failedImageUrls[url] ? url : (signedImageUrls[url] || url);
+                        const handleRemove = async () => {
+                          if (url?.includes('upselling-images')) {
+                            try {
+                              await storageAPI.deleteUpsellingImage(url);
+                            } catch {
+                              showToast('No se pudo borrar del almacenamiento', 'error');
+                            }
+                          }
+                          removeUpsellingImage(idx);
+                        };
+                        return (
+                          <div key={`${url}-${idx}`} className="position-relative d-inline-block" style={{ width: 64, height: 64 }}>
+                            <img
+                              src={displayUrl}
+                              alt=""
+                              style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 4, imageOrientation: 'from-image' }}
+                              onError={() => setFailedImageUrls((prev) => ({ ...prev, [url]: true }))}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRemove}
+                              aria-label="Remove image"
+                              className="position-absolute rounded-circle border-0 d-flex align-items-center justify-content-center bg-danger text-white"
+                              style={{ top: 2, right: 2, width: 20, height: 20, minWidth: 20, padding: 0, fontSize: 10 }}
+                            >
+                              <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {uploadingPreviews.map(({ objectUrl }, idx) => (
+                        <div key={`uploading-${idx}`} className="position-relative d-inline-block">
+                          <img src={objectUrl} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 4, opacity: 0.8, imageOrientation: 'from-image' }} />
+                          <div className="position-absolute top-0 start-0 end-0 bottom-0 d-flex align-items-center justify-content-center rounded" style={{ background: 'rgba(0,0,0,0.4)' }}>
+                            <span className="small text-white">Uploading…</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="d-none"
+                      onChange={handleImageSelect}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline-primary"
+                      type="button"
+                      disabled={imagesUploading}
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      {imagesUploading ? 'Uploading…' : '+ Add image'}
+                    </Button>
+                  </td>
+                </tr>
               </>
             )}
             {upsellings.length === 0 && !editorOpen && (
@@ -376,7 +520,6 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
               const discountVal = upselling.discount ?? upselling.discount_value;
               const selectedIds = ($formManagerForm.value.available_upselling_ids || []).map(String);
               const isSelected = selectedIds.includes(String(upselling.id));
-              console.log('isSelected', isSelected);
 
               return (
                 <tr key={upselling.id}>

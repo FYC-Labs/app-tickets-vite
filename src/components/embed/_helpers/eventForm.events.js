@@ -74,11 +74,14 @@ export const getUpsellingDiscountAmount = () => {
   }
 
   let ticketsSubtotal = 0;
+  let totalTickets = 0;
   Object.entries(selectedTickets || {}).forEach(([ticketId, quantity]) => {
-    if (quantity > 0) {
+    const q = parseInt(quantity, 10) || 0;
+    if (q > 0) {
       const ticket = tickets.find((t) => t.id === ticketId);
       if (ticket) {
-        ticketsSubtotal += parseFloat(ticket.price) * quantity;
+        ticketsSubtotal += parseFloat(ticket.price) * q;
+        totalTickets += q;
       }
     }
   });
@@ -98,11 +101,21 @@ export const getUpsellingDiscountAmount = () => {
           const isUserCanChange = quantityRule === 'USER_CAN_CHANGE';
 
           if (discountType === 'percent' && discountAmount > 0 && ticketsSubtotal > 0) {
-            const baseDiscount = (ticketsSubtotal * discountAmount) / 100;
-            upsellingDiscountAmount += isUserCanChange ? baseDiscount * qty : baseDiscount;
+            if (isUserCanChange) {
+              const applications = totalTickets > 0 ? Math.min(totalTickets, qty) : 0;
+              const discountPerTicket = totalTickets > 0 ? (ticketsSubtotal / totalTickets) * (discountAmount / 100) : 0;
+              upsellingDiscountAmount += applications * discountPerTicket;
+            } else {
+              const baseDiscount = (ticketsSubtotal * discountAmount) / 100;
+              upsellingDiscountAmount += baseDiscount;
+            }
           } else if (discountType === 'fixed' && discountAmount > 0) {
-            const baseDiscount = discountAmount;
-            upsellingDiscountAmount += isUserCanChange ? baseDiscount * qty : baseDiscount;
+            if (isUserCanChange) {
+              const applications = totalTickets > 0 ? Math.min(totalTickets, qty) : 0;
+              upsellingDiscountAmount += applications * discountAmount;
+            } else {
+              upsellingDiscountAmount += discountAmount;
+            }
           }
         }
       }

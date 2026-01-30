@@ -12,6 +12,7 @@ export const $upsellingForm = Signal({
   sales_start: '',
   sales_end: '',
   custom_fields: [],
+  images: [],
   upselling_strategy: 'PRE-CHECKOUT',
   discount_type: 'NO_DISCOUNT',
   discount_value: '',
@@ -53,6 +54,7 @@ export const handleOpenModal = (upselling = null) => {
       sales_start: upselling.sales_start ? new Date(upselling.sales_start).toISOString().slice(0, 16) : '',
       sales_end: upselling.sales_end ? new Date(upselling.sales_end).toISOString().slice(0, 16) : '',
       custom_fields: normalizedCustomFields,
+      images: Array.isArray(upselling.images) ? [...upselling.images] : [],
       upselling_strategy: upselling.upselling_strategy || 'PRE-CHECKOUT',
       discount_type: upselling.discount_type || 'NO_DISCOUNT',
       discount_value: upselling.discount ?? upselling.discount_value ?? '',
@@ -94,6 +96,7 @@ export const loadUpsellingFormForInline = (upselling = null) => {
       sales_start: upselling.sales_start ? new Date(upselling.sales_start).toISOString().slice(0, 16) : '',
       sales_end: upselling.sales_end ? new Date(upselling.sales_end).toISOString().slice(0, 16) : '',
       custom_fields: normalizedCustomFields,
+      images: Array.isArray(upselling.images) ? [...upselling.images] : [],
       upselling_strategy: upselling.upselling_strategy || 'PRE-CHECKOUT',
       discount_type: upselling.discount_type || 'NO_DISCOUNT',
       discount_value: upselling.discount ?? upselling.discount_value ?? '',
@@ -147,7 +150,10 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       return normalizedField;
     });
 
-    // Payload uses DB column names: item, amount, discount, quantity_rule, manage_inventory, etc.
+    // Leer imágenes del signal de nuevo por si hubo actualizaciones recientes (ej. subida)
+    const currentImages = Array.isArray($upsellingForm.value.images) ? $upsellingForm.value.images : [];
+
+    // Payload uses DB column names: item, amount, discount, quantity_rule, manage_inventory, images, etc.
     const submitData = {
       event_id: eventId,
       item: formData.name?.trim() || '',
@@ -161,6 +167,7 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       sales_start: formData.sales_start || null,
       sales_end: formData.sales_end || null,
       custom_fields: normalizedCustomFields,
+      images: currentImages,
     };
 
     if (editingUpselling) {
@@ -211,4 +218,14 @@ export const updateCustomField = (idx, field) => {
 export const removeCustomField = (idx) => {
   const currentFields = $upsellingForm.value.custom_fields.filter((_, i) => i !== idx);
   $upsellingForm.update({ custom_fields: currentFields });
+};
+
+export const addUpsellingImage = (url) => {
+  const current = $upsellingForm.value.images || [];
+  $upsellingForm.update({ images: [...current, url] });
+};
+
+export const removeUpsellingImage = (idx) => {
+  const current = ($upsellingForm.value.images || []).filter((_, i) => i !== idx);
+  $upsellingForm.update({ images: current });
 };

@@ -143,12 +143,25 @@ export const toggleTestCards = () => {
   showTestCards.value = !showTestCards.value;
 };
 
+const getPerUnitCustomFields = (current, upsellingId, newLength) => {
+  const existing = current[upsellingId];
+  const isArray = Array.isArray(existing);
+  const list = isArray ? [...existing] : existing && typeof existing === 'object' ? [{ ...existing }] : [];
+  const result = [];
+  for (let i = 0; i < newLength; i++) {
+    result.push(i < list.length && list[i] && typeof list[i] === 'object' ? { ...list[i] } : {});
+  }
+  return result;
+};
+
 export const handlePostCheckoutUpsellingChange = (upsellingId, quantity) => {
   const selected = { ...selectedPostCheckoutUpsellings.value };
   const customFields = { ...postCheckoutUpsellingCustomFields.value };
   const qty = parseInt(quantity, 10) || 0;
   if (qty > 0) {
     selected[upsellingId] = qty;
+    // Adjust custom fields array to match new quantity
+    customFields[upsellingId] = getPerUnitCustomFields(customFields, upsellingId, qty);
   } else {
     delete selected[upsellingId];
     delete customFields[upsellingId];
@@ -157,12 +170,17 @@ export const handlePostCheckoutUpsellingChange = (upsellingId, quantity) => {
   postCheckoutUpsellingCustomFields.value = customFields;
 };
 
-export const handlePostCheckoutUpsellingCustomFieldChange = (upsellingId, fieldLabel, value) => {
+/** unitIndex: 0-based index of the selected unit (e.g. shirt 1, shirt 2) */
+export const handlePostCheckoutUpsellingCustomFieldChange = (upsellingId, unitIndex, fieldLabel, value) => {
   const customFields = { ...postCheckoutUpsellingCustomFields.value };
-  if (!customFields[upsellingId]) {
-    customFields[upsellingId] = {};
-  }
-  customFields[upsellingId][fieldLabel] = value;
+  const existing = customFields[upsellingId];
+  // Convert to array format: [{ field1: value1 }, { field1: value2 }] per unit
+  const list = Array.isArray(existing) ? [...existing] : existing && typeof existing === 'object' ? [{ ...existing }] : [];
+  // Ensure array is long enough for the unitIndex
+  while (list.length <= unitIndex) list.push({});
+  // Update the specific unit's custom fields
+  list[unitIndex] = { ...list[unitIndex], [fieldLabel]: value };
+  customFields[upsellingId] = list;
   postCheckoutUpsellingCustomFields.value = customFields;
 };
 

@@ -124,8 +124,8 @@ function Step3UpsellingsPost() {
   const syncError = $checkout.value?.error;
 
   // Adapter: EmbedUpsellingsList uses (upsellingId, unitIndex, fieldLabel, value)
-  const onCustomFieldChange = (upsellingId, _unitIndex, fieldLabel, value) => {
-    handlePostCheckoutUpsellingCustomFieldChange(upsellingId, fieldLabel, value);
+  const onCustomFieldChange = (upsellingId, unitIndex, fieldLabel, value) => {
+    handlePostCheckoutUpsellingCustomFieldChange(upsellingId, unitIndex, fieldLabel, value);
   };
 
   if (!order) {

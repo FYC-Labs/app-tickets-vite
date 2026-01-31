@@ -70,12 +70,12 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   // Load post-checkout upsellings as soon as we have an order so step 2 shows the right button
   useEffectAsync(async () => {
     if (order?.event_id) {
-      await loadPostCheckoutUpsellings(order.event_id, form ?? null);
+      await loadPostCheckoutUpsellings(order.event_id, order, form);
       setPostCheckoutLoaded(true);
     } else {
       setPostCheckoutLoaded(false);
     }
-  }, [order?.event_id, order?.id, form]);
+  }, [order?.event_id, order?.id, order?.form_submissions, form]);
 
   // If we're on step 3 but there are no post-checkout upsellings, go back to step 2
   useEffectAsync(async () => {

@@ -28,8 +28,8 @@ function Step3UpsellingsPost() {
 
   useEffectAsync(async () => {
     if (!order?.event_id) return;
-    await loadPostCheckoutUpsellings(order.event_id, form ?? null);
-  }, [order?.event_id, order?.id]);
+    await loadPostCheckoutUpsellings(order.event_id, order, form);
+  }, [order?.event_id, order?.id, order?.form_submissions, form]);
 
   const postUpsellingsKey = JSON.stringify(selected || {});
   const postCustomFieldsKey = JSON.stringify(customFields || {});

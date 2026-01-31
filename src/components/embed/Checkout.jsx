@@ -52,7 +52,7 @@ function Checkout() {
   useEffectAsync(async () => {
     const { order: orderData, form: formData } = $checkout.value;
     if (orderData && orderData.status === 'PAID' && orderData.event_id) {
-      await resolvers.loadPostCheckoutUpsellings(orderData.event_id, formData ?? null);
+      await resolvers.loadPostCheckoutUpsellings(orderData.event_id, orderData, formData);
     }
   }, [order]);
 

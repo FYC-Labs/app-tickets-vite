@@ -32,7 +32,7 @@ function OrderConfirmation() {
       const eventId = orderData.event_id || orderData.events?.id;
       const formData = orderData.form_submissions?.forms || null;
       if (eventId) {
-        await checkoutResolvers.loadPostCheckoutUpsellings(eventId, formData);
+        await checkoutResolvers.loadPostCheckoutUpsellings(eventId, orderData, formData);
       }
     } catch (err) {
       let errorMessage = err.message || 'Unable to load order confirmation.';

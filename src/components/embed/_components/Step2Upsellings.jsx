@@ -81,12 +81,12 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
   // Load post-checkout upsellings to determine if we should show "Continue to step 3" button
   useEffectAsync(async () => {
     if (order?.event_id) {
-      await loadPostCheckoutUpsellings(order.event_id, form ?? null);
+      await loadPostCheckoutUpsellings(order.event_id, order, form);
       setPostCheckoutLoaded(true);
     } else {
       setPostCheckoutLoaded(false);
     }
-  }, [order?.event_id, order?.id, form]);
+  }, [order?.event_id, order?.id, order?.form_submissions, form]);
 
   // Create payment session only once per order. Nuvei does not allow creating a second
   // session with the same merchantInternalTransactionCode (order.id), so we do not

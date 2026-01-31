@@ -23,6 +23,8 @@ import {
   goToOrderConfirmation,
   handlePaymentSuccess,
 } from '../_helpers/eventForm.events';
+import { postCheckoutUpsellings } from '../_helpers/checkout.consts';
+import { loadPostCheckoutUpsellings } from '../_helpers/checkout.resolvers';
 
 function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByParent = false }) {
   const [searchParams] = useSearchParams();
@@ -43,12 +45,15 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
 
   const orderTotal = order != null ? parseFloat(order.total) : null;
   const isFreeOrder = orderTotal !== null && orderTotal <= 0;
+  const postCheckoutList = postCheckoutUpsellings.value ?? [];
+  const hasPostCheckoutUpsellings = postCheckoutList.length > 0;
   const showPaymentForm = !paymentFormRenderedByParent && order && paymentSession?.sessionToken && !isFreeOrder && order.status === 'PENDING' && parseFloat(order?.total) > 0;
 
   const [paymentError, setPaymentError] = useState(null);
   const [isCompletingFree, setIsCompletingFree] = useState(false);
   const [upsellingsTimerRemaining, setUpsellingsTimerRemaining] = useState(50);
   const [upsellingsSectionDismissed, setUpsellingsSectionDismissed] = useState(false);
+  const [postCheckoutLoaded, setPostCheckoutLoaded] = useState(false);
 
   const ticketsKey = JSON.stringify(selectedTickets || {});
   useEffectAsync(async () => {
@@ -72,6 +77,16 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
       $embed.update({ selectedUpsellings: updatedSelectedUpsellings });
     }
   }, [ticketsKey]);
+
+  // Load post-checkout upsellings to determine if we should show "Continue to step 3" button
+  useEffectAsync(async () => {
+    if (order?.event_id) {
+      await loadPostCheckoutUpsellings(order.event_id, form ?? null);
+      setPostCheckoutLoaded(true);
+    } else {
+      setPostCheckoutLoaded(false);
+    }
+  }, [order?.event_id, order?.id, form]);
 
   // Create payment session only once per order. Nuvei does not allow creating a second
   // session with the same merchantInternalTransactionCode (order.id), so we do not
@@ -361,26 +376,40 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
               <p className="text-muted mb-16">
                 Your order total is $0. No payment required.
               </p>
-              <Button
-                variant="dark"
-                size="lg"
-                className="w-100"
-                disabled={isCompletingFree || !isContactPreferencesValid}
-                onClick={async () => {
-                  try {
-                    setIsCompletingFree(true);
-                    setPaymentError(null);
-                    // For free orders, redirect directly to confirmation (don't go to step 3)
-                    await handleFreeOrderComplete(confirmationUrlOverride);
-                  } catch (err) {
-                    setPaymentError(err.message || 'Unable to complete order. Please try again.');
-                  } finally {
-                    setIsCompletingFree(false);
-                  }
-                }}
-              >
-                {isCompletingFree ? 'Completing...' : 'Complete order'}
-              </Button>
+              {postCheckoutLoaded && hasPostCheckoutUpsellings ? (
+                <Button
+                  variant="dark"
+                  size="lg"
+                  className="w-100"
+                  disabled={!isContactPreferencesValid}
+                  onClick={() => {
+                    if (onCompletePayment) onCompletePayment();
+                  }}
+                >
+                  Continue to step 3
+                </Button>
+              ) : postCheckoutLoaded && !hasPostCheckoutUpsellings ? (
+                <Button
+                  variant="dark"
+                  size="lg"
+                  className="w-100"
+                  disabled={isCompletingFree || !isContactPreferencesValid}
+                  onClick={async () => {
+                    try {
+                      setIsCompletingFree(true);
+                      setPaymentError(null);
+                      // For free orders without post-checkout upsellings, redirect directly to confirmation
+                      await handleFreeOrderComplete(confirmationUrlOverride);
+                    } catch (err) {
+                      setPaymentError(err.message || 'Unable to complete order. Please try again.');
+                    } finally {
+                      setIsCompletingFree(false);
+                    }
+                  }}
+                >
+                  {isCompletingFree ? 'Completing...' : 'Complete order'}
+                </Button>
+              ) : null}
             </Card.Body>
           </Card>
         )}
@@ -413,6 +442,22 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
               )}
             </Card.Body>
           </Card>
+        )}
+
+        {/* Show "Continue to step 3" button for non-free orders with post-checkout upsellings */}
+        {order && !isFreeOrder && postCheckoutLoaded && hasPostCheckoutUpsellings && (
+          <div className="mt-32">
+            <Button
+              variant="dark"
+              size="lg"
+              className="w-100"
+              onClick={() => {
+                if (onCompletePayment) onCompletePayment();
+              }}
+            >
+              Continue to step 3
+            </Button>
+          </div>
         )}
       </div>
     </>

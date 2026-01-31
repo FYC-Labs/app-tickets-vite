@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+/* eslint-disable consistent-return */
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Button } from 'react-bootstrap';
 import { AccruPay } from 'accru-pay-react';
@@ -8,8 +9,7 @@ import Loader from '@src/components/global/Loader';
 import paymentsAPI from '@src/api/payments.api';
 import { postCheckoutUpsellings } from './_helpers/checkout.consts';
 import { loadPostCheckoutUpsellings } from './_helpers/checkout.resolvers';
-import { loadFormData } from './_helpers/eventForm.events';
-import { handlePaymentSuccess, goToOrderConfirmation } from './_helpers/eventForm.events';
+import { handlePaymentSuccess, goToOrderConfirmation, handleFreeOrderComplete, loadFormData } from './_helpers/eventForm.events';
 import Step1Checkout from './_components/Step1Checkout';
 import Step2Upsellings from './_components/Step2Upsellings';
 import Step3UpsellingsPost from './_components/Step3UpsellingsPost';
@@ -17,18 +17,31 @@ import CreditCardForm from './_components/CreditCardForm';
 
 function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   const [searchParams] = useSearchParams();
-  const { isLoading, order, paymentSession, form } = $embed.value;
+  const { isLoading, order, form, paymentSession } = $embed.value;
   const [currentStep, setCurrentStep] = useState(1);
   const [postCheckoutLoaded, setPostCheckoutLoaded] = useState(false);
+  // Use ref to track currentStep to avoid stale closures in useEffectAsync
+  const currentStepRef = useRef(currentStep);
+  useEffect(() => {
+    currentStepRef.current = currentStep;
+  }, [currentStep]);
+  // Use paymentSession from signal destructuring to ensure reactivity
+  const currentPaymentSession = paymentSession;
 
   const confirmationUrlOverride = searchParams.get('confirmationUrl');
+  const orderTotal = order != null ? parseFloat(order?.total || 0) : null;
   const providers = useMemo(
-    () => (paymentSession?.preSessionData ? [{ name: 'nuvei', config: paymentSession.preSessionData }] : null),
-    [paymentSession?.preSessionData]
+    () => (currentPaymentSession?.preSessionData ? [{ name: 'nuvei', config: currentPaymentSession.preSessionData }] : null),
+    [currentPaymentSession?.preSessionData, currentPaymentSession?.sessionToken],
   );
-  const getProviders = useCallback(() => providers || [], [providers]);
-  const orderTotal = order != null ? parseFloat(order?.total) : null;
+  const getProviders = useCallback(() => {
+    if (providers) return providers;
+    // If we have a sessionToken but no preSessionData yet, return empty array
+    // AccruPay will handle it
+    return [];
+  }, [providers]);
   const isPaidOrder = order?.status === 'PAID';
+  const isFreeOrder = orderTotal !== null && orderTotal <= 0;
   const postCheckoutList = postCheckoutUpsellings.value ?? [];
   const hasPostCheckoutUpsellings = postCheckoutList.length > 0;
 
@@ -38,14 +51,15 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
       const updatedOrder = await handlePaymentSuccess(paymentData, confirmationUrlOverride, { skipRedirect: true });
       goToOrderConfirmation(confirmationUrlOverride, updatedOrder ?? undefined);
     },
-    [confirmationUrlOverride]
+    [confirmationUrlOverride],
   );
 
   // Keep card form mounted in all steps (1, 2, 3) to preserve AccruPay state
   // Only hide it if order is paid or no session
+  // Use currentPaymentSession (read from signal) instead of paymentSession (destructured)
   const showCardForm = (currentStep === 1 || currentStep === 2 || currentStep === 3)
     && order
-    && paymentSession?.sessionToken
+    && currentPaymentSession?.sessionToken
     && !isPaidOrder
     && orderTotal > 0;
 
@@ -73,20 +87,25 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   // Create payment session when order total becomes > 0 in step 2 or 3
   // This handles the case where order starts at $0 (100% discount) but upsellings are added
   useEffectAsync(async () => {
-    if (currentStep !== 2 && currentStep !== 3) return;
-    if (!order || order.status === 'PAID') return;
-    if (orderTotal <= 0) return;
-    if (paymentSession?.sessionToken) return;
+    // Read current values directly from state/signal/ref to avoid stale closures
+    const currentStepValue = currentStepRef.current;
+    const currentOrder = $embed.value.order;
+    const currentOrderTotal = currentOrder != null ? parseFloat(currentOrder?.total || 0) : null;
+    const signalSession = $embed.value.paymentSession;
+    if (currentStepValue !== 2 && currentStepValue !== 3) return;
+    if (!currentOrder || currentOrder.status === 'PAID') return;
+    if (currentOrderTotal <= 0) return;
+    if (signalSession?.sessionToken) return;
 
     try {
-      const session = await paymentsAPI.createPaymentSession(order.id);
+      const session = await paymentsAPI.createPaymentSession(currentOrder.id);
       if (session?.sessionToken) {
         $embed.update({ paymentSession: session });
       }
-    } catch {
+    } catch (err) {
       // Session creation can fail; paymentError will show when user tries to pay
     }
-  }, [currentStep, order?.id, order?.status, orderTotal, paymentSession?.sessionToken]);
+  }, [order?.id, order?.status, order?.total]);
 
   if (isLoading) {
     return (
@@ -125,17 +144,13 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
           <div className="mt-32 pt-32 border-top">
             {currentStep === 1 && <h5 className="mb-24">Payment details</h5>}
             <AccruPay
-              sessionToken={paymentSession.sessionToken}
+              sessionToken={currentPaymentSession.sessionToken}
               preferredProvider="nuvei"
               preReleaseGetProviders={getProviders}
             >
               <CreditCardForm
                 order={order}
-                showCardFields={
-                  // Show fields in step 1 always, or in step 2/3 when there's a payment session
-                  // (e.g., when order total becomes > 0 after adding upsellings to a 100% discount)
-                  currentStep === 1 || (paymentSession?.sessionToken && orderTotal > 0)
-                }
+                showCardFields={currentStep === 1}
                 showSubmitButton={
                   // Show button in step 2 if no post-checkout upsellings
                   // OR in step 3 if there are post-checkout upsellings
@@ -170,6 +185,27 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 Continue to step 3
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Show "Complete order" button when order is free (total = 0) in step 3 */}
+        {/* Only show if there's no payment session (i.e., total hasn't changed to > 0) */}
+        {currentStep === 3 && order && isFreeOrder && !isPaidOrder && hasPostCheckoutUpsellings && !currentPaymentSession?.sessionToken && (
+          <div className="mt-32 pt-32 border-top">
+            <h5 className="mb-24">Complete your order</h5>
+            <p className="text-muted mb-16">
+              Your order total is $0. No payment required.
+            </p>
+            <Button
+              variant="dark"
+              size="lg"
+              className="w-100"
+              onClick={async () => {
+                await handleFreeOrderComplete(confirmationUrlOverride);
+              }}
+            >
+              Complete Order
+            </Button>
           </div>
         )}
       </Card.Body>

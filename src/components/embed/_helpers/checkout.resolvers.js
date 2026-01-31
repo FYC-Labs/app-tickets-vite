@@ -137,13 +137,6 @@ export const fetchPaymentSession = async (orderId) => {
   }
 };
 
-/**
- * Carga upsellings POST-CHECKOUT del evento.
- * Si el formulario de la orden tiene available_upselling_ids, solo se muestran esos;
- * si no, se muestran todos los POST-CHECKOUT del evento en venta y con stock.
- * @param {string} eventId
- * @param {object|null} form - formulario de la orden (order.form_submissions?.forms); puede ser null
- */
 export const loadPostCheckoutUpsellings = async (eventId, form = null) => {
   try {
     if (!eventId) {
@@ -165,9 +158,8 @@ export const loadPostCheckoutUpsellings = async (eventId, form = null) => {
     });
 
     if (form?.available_upselling_ids?.length > 0) {
-      availableUpsellings = availableUpsellings.filter((u) =>
-        form.available_upselling_ids.includes(u.id)
-      );
+      const availableIds = form.available_upselling_ids.map(String);
+      availableUpsellings = availableUpsellings.filter((u) => availableIds.includes(String(u.id)));
     }
 
     postCheckoutUpsellings.value = availableUpsellings;

@@ -59,16 +59,16 @@ const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, 
               showCardFields
                 ? {}
                 : {
-                    position: 'absolute',
-                    width: '1px',
-                    height: '1px',
-                    padding: 0,
-                    margin: 0,
-                    overflow: 'hidden',
-                    clip: 'rect(0, 0, 0, 0)',
-                    whiteSpace: 'nowrap',
-                    borderWidth: 0,
-                  }
+                  position: 'absolute',
+                  width: '1px',
+                  height: '1px',
+                  padding: 0,
+                  margin: 0,
+                  overflow: 'hidden',
+                  clip: 'rect(0, 0, 0, 0)',
+                  whiteSpace: 'nowrap',
+                  borderWidth: 0,
+                }
             }
           >
             <Form.Group className="mb-24" controlId="cardholderName">

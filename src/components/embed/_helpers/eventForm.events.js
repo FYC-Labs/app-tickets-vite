@@ -41,7 +41,8 @@ export const loadFormData = async (formId, eventId) => {
         );
 
         if (formData.available_upselling_ids && formData.available_upselling_ids.length > 0) {
-          filteredUpsellings = filteredUpsellings.filter((u) => formData.available_upselling_ids.includes(u.id));
+          const availableIds = formData.available_upselling_ids.map(String);
+          filteredUpsellings = filteredUpsellings.filter((u) => availableIds.includes(String(u.id)));
         }
 
         $embed.update({ upsellings: filteredUpsellings });
@@ -656,7 +657,7 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null, op
       console.error('Error confirming free payment:', paymentError);
       // Re-throw with more context
       throw new Error(
-        paymentError.message || 'Failed to confirm free payment. Please try again.'
+        paymentError.message || 'Failed to confirm free payment. Please try again.',
       );
     }
 

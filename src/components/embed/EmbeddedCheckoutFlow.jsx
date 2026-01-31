@@ -25,6 +25,23 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   useEffect(() => {
     currentStepRef.current = currentStep;
   }, [currentStep]);
+  // Track if payment session existed when entering step 2
+  // This helps distinguish between:
+  // - Order from Step 1 with total > 0 (session existed) → hide fields, show button only
+  // - Order total went from 0 to >0 in Step 2 (session created) → show fields
+  const sessionExistedAtStep2Ref = useRef(false);
+  const prevStepRef = useRef(currentStep);
+  useEffect(() => {
+    // Detect when we transition TO step 2 (not just when we're in step 2)
+    if (prevStepRef.current !== 2 && currentStep === 2) {
+      // Just entered step 2 - check if session already exists
+      sessionExistedAtStep2Ref.current = Boolean(paymentSession?.sessionToken);
+    } else if (currentStep === 1) {
+      // Reset when going back to step 1
+      sessionExistedAtStep2Ref.current = false;
+    }
+    prevStepRef.current = currentStep;
+  }, [currentStep, paymentSession?.sessionToken]);
   // Use paymentSession from signal destructuring to ensure reactivity
   const currentPaymentSession = paymentSession;
 
@@ -142,7 +159,10 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
 
         {showCardForm && providers && (
           <div className="mt-32 pt-32 border-top">
-            {currentStep === 1 && <h5 className="mb-24">Payment details</h5>}
+            {/* Show "Payment details" title only in step 1, or when fields are visible in step 2/3 */}
+            {(currentStep === 1 || (currentStep !== 1 && !sessionExistedAtStep2Ref.current && currentPaymentSession?.sessionToken && orderTotal > 0)) && (
+              <h5 className="mb-24">Payment details</h5>
+            )}
             <AccruPay
               sessionToken={currentPaymentSession.sessionToken}
               preferredProvider="nuvei"
@@ -150,7 +170,12 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
             >
               <CreditCardForm
                 order={order}
-                showCardFields={currentStep === 1}
+                showCardFields={
+                  // Show fields in step 1 always
+                  // OR in step 2/3 if session was created AFTER entering step 2 (total went from 0 to >0)
+                  // If session existed when entering step 2, hide fields (order came from step 1 with total > 0)
+                  currentStep === 1 || (currentStep !== 1 && !sessionExistedAtStep2Ref.current && currentPaymentSession?.sessionToken && orderTotal > 0)
+                }
                 showSubmitButton={
                   // Show button in step 2 if no post-checkout upsellings
                   // OR in step 3 if there are post-checkout upsellings

@@ -197,7 +197,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 className="w-100 mt-24"
                 onClick={() => setCurrentStep(2)}
               >
-                Continue to step 2
+                Place order
               </Button>
             )}
             {currentStep === 2 && postCheckoutLoaded && hasPostCheckoutUpsellings && (
@@ -207,7 +207,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 className="w-100 mt-24"
                 onClick={() => setCurrentStep(3)}
               >
-                Continue to step 3
+                Pay and complete order
               </Button>
             )}
           </div>

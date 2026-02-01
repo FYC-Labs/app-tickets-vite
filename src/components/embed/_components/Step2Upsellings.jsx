@@ -386,7 +386,7 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
                     if (onCompletePayment) onCompletePayment();
                   }}
                 >
-                  Continue to step 3
+                  Pay and complete order
                 </Button>
               ) : postCheckoutLoaded && !hasPostCheckoutUpsellings ? (
                 <Button
@@ -455,7 +455,7 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
                 if (onCompletePayment) onCompletePayment();
               }}
             >
-              Continue to step 3
+              Pay and complete order
             </Button>
           </div>
         )}

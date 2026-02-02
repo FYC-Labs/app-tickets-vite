@@ -45,6 +45,7 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
         quantity,
         unit_price,
         subtotal,
+        custom_fields,
         ticket_types(name),
         upsellings(item)
       )
@@ -111,6 +112,7 @@ function buildCustomerAttributes(orderData: any) {
     quantity: item.quantity,
     unitPrice: item.unit_price,
     subtotal: item.subtotal,
+    custom_fields: item.custom_fields || {},
   }));
 
   const formResponses = orderData.form_submissions?.responses || null;
@@ -233,11 +235,26 @@ export async function syncOrderStatusToCustomerIO(
 
     const customerAttributes = buildCustomerAttributes(orderData);
 
+    // Ensure both form_responses and order_items are present in attributes
+    // form_responses can be null if no form submission exists, but should be explicitly set
+    if (!('form_responses' in customerAttributes)) {
+      customerAttributes.form_responses = null;
+    }
+    
+    // order_items should always be an array, even if empty
+    if (!('order_items' in customerAttributes)) {
+      customerAttributes.order_items = [];
+    }
+
     console.log("[DEBUG] Customer attributes before Customer.io sync:", {
       orderId,
       customer_email: orderData.customer_email,
+      order_status: customerAttributes.order_status,
       form_responses: customerAttributes.form_responses,
       has_form_responses: !!customerAttributes.form_responses,
+      order_items: customerAttributes.order_items,
+      has_order_items: !!customerAttributes.order_items && customerAttributes.order_items.length > 0,
+      order_items_count: customerAttributes.order_items?.length || 0,
       phone: customerAttributes.phone,
       preferred_channel: customerAttributes.preferred_channel,
     });
@@ -255,6 +272,13 @@ export async function syncOrderStatusToCustomerIO(
       console.log(
         `Order status synced to Customer.io for order ${orderId}, customer ${orderData.customer_email}, status: ${orderData.status}`,
       );
+      console.log("[DEBUG] Confirmed attributes saved to Customer.io:", {
+        orderId,
+        customer_email: orderData.customer_email,
+        order_status: customerAttributes.order_status,
+        form_responses_saved: !!customerAttributes.form_responses,
+        order_items_saved: customerAttributes.order_items?.length || 0,
+      });
       return { success: true };
     } else {
       console.warn(

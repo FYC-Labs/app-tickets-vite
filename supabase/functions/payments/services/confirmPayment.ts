@@ -377,18 +377,13 @@ function normalizeOrderItemForCustomerIO(item: any) {
   const name = isUpselling
     ? (item.upsellings?.item ?? item.upsellings?.name ?? "")
     : (item.ticket_types?.name ?? item.ticket_type_name ?? "");
-  const hasCustomFields =
-    item.custom_fields != null &&
-    (Array.isArray(item.custom_fields)
-      ? item.custom_fields.length > 0
-      : Object.keys(item.custom_fields).length > 0);
   return {
     type: isUpselling ? "upselling" : "ticket",
     name,
     quantity: item.quantity ?? 0,
     unitPrice: item.unit_price ?? 0,
     subtotal: item.subtotal ?? 0,
-    ...(hasCustomFields ? { custom_fields: item.custom_fields } : {}),
+    custom_fields: item.custom_fields || {},
   };
 }
 
@@ -566,6 +561,30 @@ async function sendConfirmationEmail(
         orderId,
       );
 
+      // Ensure both form_responses and order_items are present in attributes
+      // form_responses can be null if no form submission exists, but should be explicitly set
+      if (!('form_responses' in customerAttributes)) {
+        customerAttributes.form_responses = null;
+      }
+      
+      // order_items should always be an array, even if empty
+      if (!('order_items' in customerAttributes)) {
+        customerAttributes.order_items = [];
+      }
+
+      console.log("[DEBUG] Customer attributes before Customer.io sync (confirmPayment):", {
+        orderId,
+        customer_email: eventData.customer_email,
+        order_status: customerAttributes.order_status,
+        form_responses: customerAttributes.form_responses,
+        has_form_responses: !!customerAttributes.form_responses,
+        order_items: customerAttributes.order_items,
+        has_order_items: !!customerAttributes.order_items && customerAttributes.order_items.length > 0,
+        order_items_count: customerAttributes.order_items?.length || 0,
+        phone: customerAttributes.phone,
+        preferred_channel: customerAttributes.preferred_channel,
+      });
+
       const identifyResult = await identifyCustomer(
         {
           siteId: event.customerio_site_id,
@@ -580,6 +599,13 @@ async function sendConfirmationEmail(
           "Customer identified successfully in Customer.io:",
           eventData.customer_email,
         );
+        console.log("[DEBUG] Confirmed attributes saved to Customer.io (confirmPayment):", {
+          orderId,
+          customer_email: eventData.customer_email,
+          order_status: customerAttributes.order_status,
+          form_responses_saved: !!customerAttributes.form_responses,
+          order_items_saved: customerAttributes.order_items?.length || 0,
+        });
       } else {
         console.warn("Customer.io identify failed:", identifyResult.error);
       }

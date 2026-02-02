@@ -40,15 +40,11 @@ export const loadFormData = async (formId, eventId) => {
           (u) => u.upselling_strategy === 'PRE-CHECKOUT',
         );
 
-        // Si el form tiene available_upselling_ids, filtrar solo esos upsellings
-        // Si available_upselling_ids existe pero está vacío, no mostrar ningún upselling
-        // Si no existe available_upselling_ids, mostrar todos los disponibles
         if (formData && 'available_upselling_ids' in formData) {
           if (formData.available_upselling_ids && Array.isArray(formData.available_upselling_ids) && formData.available_upselling_ids.length > 0) {
             const availableIds = formData.available_upselling_ids.map(String);
             filteredUpsellings = filteredUpsellings.filter((u) => availableIds.includes(String(u.id)));
           } else {
-            // Si available_upselling_ids está definido pero vacío, no mostrar ningún upselling
             filteredUpsellings = [];
           }
         }

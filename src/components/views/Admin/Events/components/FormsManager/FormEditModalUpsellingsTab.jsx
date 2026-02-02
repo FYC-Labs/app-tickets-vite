@@ -66,10 +66,9 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
   const [imagesUploading, setImagesUploading] = useState(false);
   const [uploadingPreviews, setUploadingPreviews] = useState([]); // [{ file, objectUrl }]
   const [signedImageUrls, setSignedImageUrls] = useState({}); // { publicUrl -> signedUrl }
-  const [failedImageUrls, setFailedImageUrls] = useState({}); // si falla la carga, probar URL pública
+  const [failedImageUrls, setFailedImageUrls] = useState({});
   const imageInputRef = useRef(null);
 
-  // Obtener signed URLs para miniaturas (funciona con bucket público o privado)
   const imageUrls = formData.images || [];
   const imageUrlsKey = imageUrls.length ? imageUrls.join(',') : '';
   useEffect(() => {
@@ -96,7 +95,7 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
       setSignedImageUrls({ ...fallbacks, ...Object.fromEntries(pairs) });
     });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- imageUrlsKey es la dependencia estable de la lista de URLs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageUrlsKey]);
 
   const handleImageSelect = async (e) => {
@@ -116,7 +115,6 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
         fileList.map((file) => storageAPI.uploadUpsellingImage(file, eventId, folderId)),
       );
       urls.forEach((url) => addUpsellingImage(url));
-      // Obtener signed URLs de las imágenes recién subidas para que la miniatura se vea de inmediato
       const newSigned = await Promise.all(
         urls.map(async (url) => {
           try {

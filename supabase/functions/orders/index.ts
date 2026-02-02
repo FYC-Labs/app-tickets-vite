@@ -665,7 +665,7 @@ Deno.serve(async (req: Request) => {
 
         if (updateError) throw updateError;
 
-        // Importante: NO tocar inventario de upsellings aquí; solo al marcar la orden como PAID
+        // Important: Do not update the upselling inventory here; just mark the order as PAID
 
         result = { data: updatedOrder };
         break;

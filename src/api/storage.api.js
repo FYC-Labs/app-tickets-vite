@@ -1,7 +1,3 @@
-/**
- * Subida de imágenes de upsellings vía Edge Function (service role en servidor).
- * Evita "signature verification failed" al no llamar a Storage desde el cliente.
- */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -58,9 +54,8 @@ export async function uploadUpsellingImage(file, eventId, folderId = 'new') {
 }
 
 /**
- * Obtiene una signed URL (1h) para mostrar la imagen del bucket (funciona con bucket público o privado).
- * @param {string} publicUrl - URL pública devuelta al subir (o path)
- * @returns {Promise<string>} URL firmada para usar en img src
+ * @param {string} publicUrl
+ * @returns {Promise<string>}
  */
 export async function getSignedUpsellingImageUrl(publicUrl) {
   if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase URL or anon key missing');
@@ -84,9 +79,8 @@ export async function getSignedUpsellingImageUrl(publicUrl) {
 }
 
 /**
- * Borra una imagen del bucket (por URL pública). Solo aplica a URLs de upselling-images.
- * @param {string} publicUrl - URL pública de la imagen en el bucket
- * @returns {Promise<boolean>} true si se borró
+ * @param {string} publicUrl
+ * @returns {Promise<boolean>}
  */
 export async function deleteUpsellingImage(publicUrl) {
   if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase URL or anon key missing');

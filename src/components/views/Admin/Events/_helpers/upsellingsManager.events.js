@@ -150,7 +150,6 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       return normalizedField;
     });
 
-    // Leer imágenes del signal de nuevo por si hubo actualizaciones recientes (ej. subida)
     const currentImages = Array.isArray($upsellingForm.value.images) ? $upsellingForm.value.images : [];
 
     // Payload uses DB column names: item, amount, discount, quantity_rule, manage_inventory, images, etc.

@@ -138,14 +138,10 @@ export const fetchPaymentSession = async (orderId) => {
 };
 
 const getFormFromOrder = (order, fallbackForm) => {
-  // Priorizar form desde order.form_submissions?.forms (tiene available_upselling_ids actualizado)
-  // Puede ser un objeto o un array con un solo elemento
   if (order?.form_submissions?.forms) {
     const { forms } = order.form_submissions;
-    // Si es un array, tomar el primer elemento; si es un objeto, usarlo directamente
     return Array.isArray(forms) ? forms[0] : forms;
   }
-  // Fallback al form del signal
   return fallbackForm ?? null;
 };
 
@@ -156,7 +152,6 @@ export const loadPostCheckoutUpsellings = async (eventId, order = null, fallback
       return;
     }
 
-    // Obtener el form correcto (prioriza order.form_submissions?.forms)
     const form = getFormFromOrder(order, fallbackForm);
 
     const allUpsellings = await upsellingsAPI.getByEventId(eventId);
@@ -177,7 +172,7 @@ export const loadPostCheckoutUpsellings = async (eventId, order = null, fallback
         const availableIds = form.available_upselling_ids.map(String);
         availableUpsellings = availableUpsellings.filter((u) => availableIds.includes(String(u.id)));
       } else {
-        // Si available_upselling_ids está definido pero vacío, no mostrar ningún upselling
+        // if available_upsellings_ids is defined but empty, do not show any upselling
         availableUpsellings = [];
       }
     }

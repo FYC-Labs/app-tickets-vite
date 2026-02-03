@@ -257,6 +257,7 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       request_communication_preference: formData.request_communication_preference ?? false,
       theme: formData.theme,
       order_confirmation_url: formData.order_confirmation_url || null,
+      upsellings_display: formData.upsellings_display || 'LIST',
     };
 
     const { editingForm } = $formManagerUI.value;

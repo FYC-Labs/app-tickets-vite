@@ -30,6 +30,21 @@ function FormEditModalGeneralTab() {
           </Form.Text>
         </Form.Group>
 
+        <Form.Group className="mb-24">
+          <Form.Label>Upsellings Display</Form.Label>
+          <UniversalInput
+            as="select"
+            name="upsellings_display"
+            signal={$formManagerForm}
+          >
+            <option value="LIST">List</option>
+            <option value="CAROUSEL">Carousel</option>
+          </UniversalInput>
+          <Form.Text className="text-muted">
+            Choose how to display the upsellings (if any) in the form embed
+          </Form.Text>
+        </Form.Group>
+
         <div className="mb-24">
           <Form.Label className="d-block mb-16">Display Options</Form.Label>
           <UniversalInput

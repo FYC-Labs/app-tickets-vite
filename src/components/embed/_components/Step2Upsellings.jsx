@@ -51,7 +51,7 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
 
   const [paymentError, setPaymentError] = useState(null);
   const [isCompletingFree, setIsCompletingFree] = useState(false);
-  const [upsellingsTimerRemaining, setUpsellingsTimerRemaining] = useState(50);
+  const [upsellingsTimerRemaining, setUpsellingsTimerRemaining] = useState(10);
   const [upsellingsSectionDismissed, setUpsellingsSectionDismissed] = useState(false);
   const [postCheckoutLoaded, setPostCheckoutLoaded] = useState(false);
 
@@ -271,7 +271,7 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
                 <p className="text-muted mb-0">
                   Add these items to your order
                   {upsellingsTimerRemaining > 0 && (
-                    <span className="ms-8 text-warning fw-semibold">
+                    <span className="ms-8 text-danger fw-semibold">
                       — Offer ends in {upsellingsTimerRemaining}s
                     </span>
                   )}

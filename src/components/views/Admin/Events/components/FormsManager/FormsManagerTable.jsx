@@ -1,3 +1,4 @@
+/* eslint-disable no-nested-ternary */
 import { Card, Button, Dropdown, Badge } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faEllipsisV } from '@fortawesome/free-solid-svg-icons';

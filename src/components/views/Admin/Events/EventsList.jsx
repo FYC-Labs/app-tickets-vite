@@ -1,12 +1,25 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, Dropdown } from 'react-bootstrap';
+import { faEllipsisV, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faEllipsisV } from '@fortawesome/free-solid-svg-icons';
-import { format } from 'date-fns';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
-import { $events, $view, $filter } from '@src/signals';
 import SignalTable from '@src/components/global/SignalTable';
-import { loadEvents, handleDelete, handlePublish, getStatusBadge } from './_helpers/eventsList.events';
+import { $events, $filter, $view } from '@src/signals';
+import { format } from 'date-fns';
+import {
+  Badge,
+  Button,
+  Card,
+  Col,
+  Container,
+  Dropdown,
+  Row,
+} from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  getStatusBadge,
+  handleDelete,
+  handlePublish,
+  loadEvents,
+} from './_helpers/eventsList.events';
 
 function EventsList() {
   const navigate = useNavigate();
@@ -40,13 +53,9 @@ function EventsList() {
       );
     },
     actions: () => (
-      <span onClick={(e) => e.stopPropagation()}>
+      <div onClick={(e) => e.stopPropagation()} role="button" tabIndex={0}>
         <Dropdown>
-          <Dropdown.Toggle
-            variant="link"
-            size="sm"
-            className="text-white"
-          >
+          <Dropdown.Toggle variant="link" size="sm" className="text-white">
             <FontAwesomeIcon icon={faEllipsisV} />
           </Dropdown.Toggle>
 
@@ -59,7 +68,9 @@ function EventsList() {
             >
               Manage Event
             </Dropdown.Item>
-            <Dropdown.Item onClick={(e) => handlePublish(e, event.id, event.status)}>
+            <Dropdown.Item
+              onClick={(e) => handlePublish(e, event.id, event.status)}
+            >
               {event.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
             </Dropdown.Item>
             <Dropdown.Divider />
@@ -71,7 +82,7 @@ function EventsList() {
             </Dropdown.Item>
           </Dropdown.Menu>
         </Dropdown>
-      </span>
+      </div>
     ),
   }));
 

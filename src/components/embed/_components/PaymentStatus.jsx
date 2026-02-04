@@ -36,4 +36,3 @@ function PaymentStatus({ paymentStatus, error, order }) {
 }
 
 export default PaymentStatus;
-

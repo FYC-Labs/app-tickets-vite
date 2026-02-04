@@ -1,8 +1,8 @@
 import { Signal } from '@fyclabs/tools-fyc-react/signals';
 import ordersAPI from '@src/api/orders.api';
 import { showToast } from '@src/components/global/Alert/_helpers/alert.events';
-import { $statusFilter, $deleteOrder } from './salesManager.consts';
 import { format } from 'date-fns';
+import { $statusFilter, $deleteOrder } from './salesManager.consts';
 
 export const $sales = Signal({
   orders: [],
@@ -107,7 +107,7 @@ export const exportToCSV = (orders, eventId) => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     const filterSuffix = $statusFilter.value ? `-${$statusFilter.value}` : '';
     const dateStr = format(new Date(), 'yyyy-MM-dd');
     link.setAttribute('href', url);

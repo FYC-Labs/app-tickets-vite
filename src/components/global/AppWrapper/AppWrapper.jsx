@@ -1,11 +1,19 @@
+import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
+import { $global } from '@src/signals';
+import {
+  getCurrentAuthenticatedUser,
+  handleFirebaseLogin,
+  handleFirebaseLogout,
+} from '@src/utils/auth';
+import { auth } from '@src/utils/firebase';
+import {
+  destroyUserback,
+  initializeUserback,
+  updateUserbackUser,
+} from '@src/utils/userback';
 import useWindowSize from '@src/utils/windowSize';
 import { Badge, Container } from 'react-bootstrap';
 import { Outlet } from 'react-router-dom';
-import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
-import { auth } from '@src/utils/firebase';
-import { $global, $user } from '@src/signals';
-import { getCurrentAuthenticatedUser, handleFirebaseLogin, handleFirebaseLogout } from '@src/utils/auth';
-import { initializeUserback, updateUserbackUser, destroyUserback } from '@src/utils/userback';
 import Loadable from '../Loadable';
 
 const AppWrapper = () => {

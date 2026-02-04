@@ -56,4 +56,3 @@ function OrderSummary({ order }) {
 }
 
 export default OrderSummary;
-

@@ -1,23 +1,19 @@
 /* eslint-disable no-nested-ternary */
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card, Row, Col, Form, Alert, Button } from 'react-bootstrap';
+import { Card, Alert, Button } from 'react-bootstrap';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
-import UniversalInput from '@src/components/global/Inputs/UniversalInput';
-import { formatPhone } from '@src/components/global/Inputs/UniversalInput/_helpers/universalinput.events';
-import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import { AccruPay } from 'accru-pay-react';
 import ordersAPI from '@src/api/orders.api';
 import paymentsAPI from '@src/api/payments.api';
 import formsAPI from '@src/api/forms.api';
-import OrderSummary from './OrderSummary';
+import OrderItemsSummary from './OrderItemsSummary';
 import EmbedUpsellingsList from './EmbedUpsellingsList';
 import CreditCardForm from './CreditCardForm';
 import {
   handleUpsellingChange,
   handleUpsellingCustomFieldChange,
-  handleFieldChange,
   handleFreeOrderComplete,
   getUpsellingDiscountAmount,
   goToOrderConfirmation,
@@ -35,9 +31,7 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
     ? [{ name: 'nuvei', config: paymentSession.preSessionData }]
     : null;
 
-  const requestPhone = form?.request_phone_number === true;
   const requestPreference = form?.request_communication_preference === true;
-  const showExtraFields = requestPhone || requestPreference;
   const hasPreferredChannel = Boolean(formData?.preferred_channel?.trim?.());
   const isContactPreferencesValid = !requestPreference || hasPreferredChannel;
 
@@ -51,8 +45,9 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
 
   const [paymentError, setPaymentError] = useState(null);
   const [isCompletingFree, setIsCompletingFree] = useState(false);
-  const [upsellingsTimerRemaining, setUpsellingsTimerRemaining] = useState(10);
-  const [upsellingsSectionDismissed, setUpsellingsSectionDismissed] = useState(false);
+  // Timer functionality paused - commented out
+  // const [upsellingsTimerRemaining, setUpsellingsTimerRemaining] = useState(10);
+  // const [upsellingsSectionDismissed, setUpsellingsSectionDismissed] = useState(false);
   const [postCheckoutLoaded, setPostCheckoutLoaded] = useState(false);
 
   const ticketsKey = JSON.stringify(selectedTickets || {});
@@ -144,24 +139,24 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
     };
   }, [order?.form_submission_id, contactPrefsKey, schemaKeys]);
 
-  const preCheckoutUpsellingsList = upsellings?.filter((u) => u.upselling_strategy === 'PRE-CHECKOUT') ?? [];
+  // Timer functionality paused - commented out
+  // const preCheckoutUpsellingsList = upsellings?.filter((u) => u.upselling_strategy === 'PRE-CHECKOUT') ?? [];
+  // useEffect(() => {
+  //   if (preCheckoutUpsellingsList.length === 0 || upsellingsSectionDismissed) {
+  //     return undefined;
+  //   }
+  //   const id = setInterval(() => {
+  //     setUpsellingsTimerRemaining((prev) => (prev <= 0 ? 0 : prev - 1));
+  //   }, 1000);
+  //   return () => clearInterval(id);
+  // }, [upsellingsSectionDismissed, preCheckoutUpsellingsList.length]);
 
-  useEffect(() => {
-    if (preCheckoutUpsellingsList.length === 0 || upsellingsSectionDismissed) {
-      return undefined;
-    }
-    const id = setInterval(() => {
-      setUpsellingsTimerRemaining((prev) => (prev <= 0 ? 0 : prev - 1));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [upsellingsSectionDismissed, preCheckoutUpsellingsList.length]);
-
-  useEffect(() => {
-    if (upsellingsTimerRemaining !== 0 || upsellingsSectionDismissed) return;
-    const selected = $embed.value.selectedUpsellings || {};
-    const hasAny = Object.values(selected).some((q) => (q || 0) > 0);
-    if (!hasAny) setUpsellingsSectionDismissed(true);
-  }, [upsellingsTimerRemaining, upsellingsSectionDismissed]);
+  // useEffect(() => {
+  //   if (upsellingsTimerRemaining !== 0 || upsellingsSectionDismissed) return;
+  //   const selected = $embed.value.selectedUpsellings || {};
+  //   const hasAny = Object.values(selected).some((q) => (q || 0) > 0);
+  //   if (!hasAny) setUpsellingsSectionDismissed(true);
+  // }, [upsellingsTimerRemaining, upsellingsSectionDismissed]);
 
   const upsellingsKey = JSON.stringify($embed.value.selectedUpsellings || {});
   const customFieldsKey = JSON.stringify($embed.value.upsellingCustomFields || {});
@@ -240,25 +235,9 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
     }
   }, [order?.id, upsellingsKey, customFieldsKey]);
 
-  const renderFormSchemaField = (field, index) => {
-    const key = field.field_id_string != null ? field.field_id_string : field.label;
-    const value = formData?.[key] ?? '';
-    return (
-      <FormDynamicField
-        key={index}
-        field={field}
-        index={index}
-        value={value}
-        groupClassName="mb-16"
-        labelClassName="small"
-        selectPlaceholder={field.placeholder || 'Select...'}
-        onChange={(newValue) => handleFieldChange(field.label, newValue, field.field_id_string)}
-      />
-    );
-  };
-
   const preCheckoutUpsellings = upsellings.filter(u => u.upselling_strategy === 'PRE-CHECKOUT');
-  const showUpsellingsSection = preCheckoutUpsellings.length > 0 && !upsellingsSectionDismissed;
+  // Timer functionality paused - always show upsellings section
+  const showUpsellingsSection = preCheckoutUpsellings.length > 0; // && !upsellingsSectionDismissed;
 
   return (
     <>
@@ -270,11 +249,12 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
                 <h3 className="mb-4">You might also like...</h3>
                 <p className="text-muted mb-0">
                   Add these items to your order
-                  {upsellingsTimerRemaining > 0 && (
+                  {/* Timer functionality paused - commented out */}
+                  {/* {upsellingsTimerRemaining > 0 && (
                     <span className="ms-8 text-danger fw-semibold">
                       — Offer ends in {upsellingsTimerRemaining}s
                     </span>
-                  )}
+                  )} */}
                 </p>
               </div>
               {onGoBack && (
@@ -302,62 +282,9 @@ function Step2Upsellings({ onGoBack, onCompletePayment, paymentFormRenderedByPar
         </>
       )}
 
-      {showExtraFields && (
-        <Card className="mt-32 border-0">
-          <Card.Body className="p-24">
-            <h6 className="mb-16 fw-semibold">Contact preferences</h6>
-            <Row>
-              {requestPhone && (
-                <Col xs={12} md={requestPreference ? 6 : 12} className="mb-16 mb-md-0">
-                  <Form.Group>
-                    <Form.Label className="small">Phone number</Form.Label>
-                    <UniversalInput
-                      type="tel"
-                      name="phone_number"
-                      value={formData?.phone_number ?? ''}
-                      customOnChange={(e) => handleFieldChange('phone_number', formatPhone(e.target.value))}
-                      placeholder="(555) 123-4567"
-                      className="form-control"
-                    />
-                  </Form.Group>
-                </Col>
-              )}
-              {requestPreference && (
-                <Col xs={12} md={requestPhone ? 6 : 12}>
-                  <Form.Group>
-                    <Form.Label className="small">How would you like to be contacted? *</Form.Label>
-                    <UniversalInput
-                      as="select"
-                      name="preferred_channel"
-                      value={formData?.preferred_channel ?? ''}
-                      customOnChange={(e) => handleFieldChange('preferred_channel', e.target.value)}
-                      className="form-control"
-                      required
-                    >
-                      <option value="">Select...</option>
-                      <option value="email">Email</option>
-                      <option value="sms">SMS</option>
-                    </UniversalInput>
-                  </Form.Group>
-                </Col>
-              )}
-            </Row>
-          </Card.Body>
-        </Card>
-      )}
-
-      {form?.schema?.length > 0 && (
-        <Card className="mt-32 border-0">
-          <Card.Body className="p-24">
-            <h6 className="mb-16 fw-semibold">Additional information</h6>
-            {form.schema.map((field, index) => renderFormSchemaField(field, index))}
-          </Card.Body>
-        </Card>
-      )}
-
       {order && (
         <div className="mt-32">
-          <OrderSummary order={order} />
+          <OrderItemsSummary order={order} />
         </div>
       )}
 

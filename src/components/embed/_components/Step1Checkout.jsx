@@ -114,9 +114,6 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
                     <Row className="align-items-center">
                       <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
                         <div className="d-flex align-items-start">
-                          <div className="me-16">
-                            <span className="icon-ticket">🎫</span>
-                          </div>
                           <div className="flex-grow-1">
                             <h6 className="mb-8">{ticket.name}</h6>
                             {ticket.description && (
@@ -162,7 +159,7 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
                         {selectedQty > 0 && (
                           <div className="mt-8">
                             <small className="text-muted">Subtotal: </small>
-                            <strong className="text-primary">
+                            <strong className="text-dark">
                               ${(parseFloat(ticket.price) * selectedQty).toFixed(2)}
                             </strong>
                           </div>

@@ -300,7 +300,7 @@ function EmbedUpsellingsList({
               {selectedQty > 0 && (
               <div className="mt-8">
                 <small className="text-muted">Subtotal: </small>
-                <strong className="text-primary">
+                <strong className="text-dark">
                   ${(parseFloat(upselling.amount ?? upselling.price) * selectedQty).toFixed(2)}
                 </strong>
               </div>

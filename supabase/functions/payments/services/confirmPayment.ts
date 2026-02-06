@@ -74,9 +74,27 @@ async function verifyPaymentTransaction(
     };
   }
 
-  return await accruPay.transactions.verifyClientPaymentSession({
+  console.log("[ACCRUPAY][confirmPayment] Verifying client payment session", {
+    payment_intent_id: order.payment_intent_id,
+    envTag,
+  });
+
+  // NPM docs 0.15: clientSessions.payments.verify({ id }) — replaces verifyClientPaymentSession
+  const result = await accruPay.transactions.clientSessions.payments.verify({
     id: order.payment_intent_id,
   });
+
+  console.log(
+    "[ACCRUPAY][confirmPayment] clientSessions.payments.verify result:",
+    {
+      id: result.id,
+      status: result.status,
+      hasPaymentMethod: !!result.paymentMethod,
+      paymentMethodId: result.paymentMethod?.id ?? result.paymentMethodId,
+    },
+  );
+
+  return result;
 }
 
 /**
@@ -87,6 +105,7 @@ async function updateOrderStatus(
   status: "PAID" | "FAILED",
   transactionId: string | null,
   supabaseClient: any,
+  paymentMethodId?: string | null,
 ) {
   const updateData: any = {
     status,
@@ -95,6 +114,12 @@ async function updateOrderStatus(
 
   if (transactionId) {
     updateData.payment_intent_id = transactionId;
+  }
+
+  // Persist stored payment method id when available
+  if (paymentMethodId) {
+    // Column name as created in the database
+    updateData.paymentMethodId = paymentMethodId;
   }
 
   const { error: updateError } = await supabaseClient
@@ -117,13 +142,47 @@ async function updateTicketInventory(orderId: string, supabaseClient: any) {
   if (!orderItems) return [];
 
   for (const item of orderItems) {
-    await supabaseClient.rpc("increment_ticket_sold", {
-      ticket_id: item.ticket_type_id,
-      amount: item.quantity,
-    });
+    if (item.ticket_type_id != null) {
+      await supabaseClient.rpc("increment_ticket_sold", {
+        ticket_id: item.ticket_type_id,
+        amount: item.quantity,
+      });
+    }
   }
 
   return orderItems;
+}
+
+/**
+ * Updates upselling sold count after successful payment
+ */
+async function updateUpsellingSold(orderId: string, supabaseClient: any) {
+  const { data: orderItems } = await supabaseClient
+    .from("order_items")
+    .select("upselling_id, quantity")
+    .eq("order_id", orderId);
+
+  if (!orderItems) return;
+
+  for (const item of orderItems) {
+    if (item.upselling_id) {
+      const { data: upselling } = await supabaseClient
+        .from("upsellings")
+        .select("quantity, sold")
+        .eq("id", item.upselling_id)
+        .maybeSingle();
+
+      if (upselling && upselling.quantity !== null) {
+        await supabaseClient
+          .from("upsellings")
+          .update({
+            sold: (upselling.sold || 0) + item.quantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", item.upselling_id);
+      }
+    }
+  }
 }
 
 /**
@@ -161,136 +220,196 @@ async function updateDiscountCodeUsage(orderId: string, supabaseClient: any) {
 }
 
 /**
- * Fetches event and order data for email
+ * Runs post-payment steps: inventory, upsellings sold, discount usage, Slack, email.
  */
-async function getEventAndOrderData(orderId: string, supabaseClient: any) {
-  const { data: eventData, error } = await supabaseClient
-    .from("orders")
-    .select(
-      `
-      event_id,
-      form_submission_id,
-      customer_name,
-      customer_email,
-      customer_first_name,
-      customer_last_name,
-      customer_phone,
-      billing_address,
-      billing_address_2,
-      billing_city,
-      billing_state,
-      billing_zip,
-      created_at,
-      payment_intent_id,
-      total,
-      subtotal,
-      discount_amount,
-      discount_code_id,
-      status,
-      events!inner (
-        title,
-        start_date,
-        end_date,
-        location,
-        customerio_app_api_key,
-        customerio_transactional_template_id,
-        customerio_site_id,
-        customerio_track_api_key,
-        customerio_custom_attribute_key,
-        customerio_custom_attribute_value
+export async function runPostPaymentSteps(
+  orderId: string,
+  order: { events?: { slack_webhook_url?: string } },
+  supabaseClient: any,
+) {
+  await updateTicketInventory(orderId, supabaseClient);
+  await updateUpsellingSold(orderId, supabaseClient);
+
+  const { data: fullOrderItems } = await supabaseClient
+    .from("order_items")
+    .select("*, ticket_types(name), upsellings(item)")
+    .eq("order_id", orderId);
+
+  await updateDiscountCodeUsage(orderId, supabaseClient);
+
+  const slackWebhookUrl = order.events?.slack_webhook_url;
+  if (slackWebhookUrl) {
+    const { data: fullOrder } = await supabaseClient
+      .from("orders")
+      .select(
+        "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
       )
-    `,
-    )
-    .eq("id", orderId)
-    .single();
-
-  if (error) {
-    console.error("Error fetching event and order data for email:", {
-      orderId,
-      error: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-    });
-    return null;
-  }
-
-  if (!eventData) {
-    console.warn("No event data found for order:", orderId);
-    return null;
-  }
-
-  // Fetch form_submissions separately to avoid relationship ambiguity
-  let formSubmission = null;
-  
-  if (eventData.form_submission_id) {
-    const { data: submission, error: submissionError } = await supabaseClient
-      .from("form_submissions")
-      .select("responses")
-      .eq("id", eventData.form_submission_id)
+      .eq("id", orderId)
       .maybeSingle();
 
-    if (!submissionError && submission) {
-      formSubmission = submission;
+    if (fullOrder) {
+      sendSlackNotification(slackWebhookUrl, fullOrder).catch((error) => {
+        console.warn("Failed to send Slack notification:", error);
+      });
     }
   }
 
-  // If not found via form_submission_id, try via order_id
-  if (!formSubmission) {
-    const { data: submission, error: submissionError } = await supabaseClient
-      .from("form_submissions")
-      .select("responses")
-      .eq("order_id", orderId)
-      .maybeSingle();
-
-    if (!submissionError && submission) {
-      formSubmission = submission;
-    }
-  }
-
-  // Attach form_submission to eventData for consistency
-  eventData.form_submissions = formSubmission;
-
-  return eventData;
+  console.log("[Customer.io] Sending confirmation email", fullOrderItems);
+  const triggerData = await sendConfirmationEmail(
+    orderId,
+    fullOrderItems ?? [],
+    supabaseClient,
+  );
+  return triggerData;
 }
 
 /**
- * Builds trigger data for Customer.io email
+ * Fetches event and order data for email
+ */
+async function getEventAndOrderData(orderId: string, supabaseClient: any) {
+  try {
+    const { data: eventData, error } = await supabaseClient
+      .from("orders")
+      .select(
+        `
+        event_id,
+        form_submission_id,
+        customer_name,
+        customer_email,
+        customer_first_name,
+        customer_last_name,
+        customer_phone,
+        billing_address,
+        billing_address_2,
+        billing_city,
+        billing_state,
+        billing_zip,
+        created_at,
+        payment_intent_id,
+        total,
+        subtotal,
+        discount_amount,
+        discount_code_id,
+        status,
+        events!inner (
+          title,
+          start_date,
+          end_date,
+          location,
+          customerio_app_api_key,
+          customerio_transactional_template_id,
+          customerio_site_id,
+          customerio_track_api_key,
+          customerio_custom_attribute_key,
+          customerio_custom_attribute_value
+        )
+      `,
+      )
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching event and order data for email:", {
+        orderId,
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      return null;
+    }
+
+    if (!eventData) {
+      console.warn("No event data found for order:", orderId);
+      return null;
+    }
+
+    if (!eventData) {
+      console.warn("No event data found for order:", orderId);
+      return null;
+    }
+
+    // Fetch form_submissions separately to avoid relationship ambiguity
+    let formSubmission = null;
+    
+    if (eventData.form_submission_id) {
+      const { data: submission, error: submissionError } = await supabaseClient
+        .from("form_submissions")
+        .select("responses")
+        .eq("id", eventData.form_submission_id)
+        .maybeSingle();
+
+      if (!submissionError && submission) {
+        formSubmission = submission;
+      }
+    }
+
+    // If not found via form_submission_id, try via order_id
+    if (!formSubmission) {
+      const { data: submission, error: submissionError } = await supabaseClient
+        .from("form_submissions")
+        .select("responses")
+        .eq("order_id", orderId)
+        .maybeSingle();
+
+      if (!submissionError && submission) {
+        formSubmission = submission;
+      }
+    }
+
+    // Attach form_submission to eventData for consistency
+    eventData.form_submissions = formSubmission;
+
+    return eventData;
+  } catch (err: any) {
+    console.error("Unexpected error in getEventAndOrderData:", {
+      orderId,
+      error: err.message,
+      stack: err.stack,
+    });
+    return null;
+  }
+}
+
+/** Normalize one order item for Customer.io (ticket or upselling, plus custom_fields when present) */
+function normalizeOrderItemForCustomerIO(item: any) {
+  const isUpselling = !!item.upselling_id || !!item.upsellings;
+  const name = isUpselling
+    ? (item.upsellings?.item ?? item.upsellings?.name ?? "")
+    : (item.ticket_types?.name ?? item.ticket_type_name ?? "");
+  return {
+    type: isUpselling ? "upselling" : "ticket",
+    name,
+    quantity: item.quantity ?? 0,
+    unitPrice: item.unit_price ?? 0,
+    subtotal: item.subtotal ?? 0,
+    custom_fields: item.custom_fields || {},
+  };
+}
+
+/**
+ * Builds trigger data for Customer.io email (includes tickets, upsellings, custom_fields)
  */
 function buildEmailTriggerData(
   eventData: any,
   orderItems: any[],
   orderId: string,
 ) {
-  const orderDetails = eventData;
-  const customerName = orderDetails.customer_name || "";
-  const customerEmail = orderDetails.customer_email || "";
-  const createdAt = orderDetails.created_at || new Date().toISOString();
-  const paymentIntentId = orderDetails.payment_intent_id || "";
-  const total = orderDetails.total || 0;
-  const subtotal = orderDetails.subtotal || 0;
-  const discountAmount = orderDetails.discount_amount || 0;
-  const discountCode = orderDetails.discount_code_id || "";
-  const status = orderDetails.status || "";
-  const eventTitle = orderDetails.events?.title || "";
-
-  const orderItemsArr = (orderItems || []).map((item: any) => ({
-    ticketTypeName: item.ticket_type_name || "",
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    subtotal: item.subtotal,
-  }));
+  const orderItemsArr = (orderItems || []).map(normalizeOrderItemForCustomerIO);
 
   return {
     name: eventData.customer_name || "Customer",
     email: eventData.customer_email,
     orderId: orderId,
     purchasedAt: new Date().toISOString().split("T")[0],
+    order_items: orderItemsArr,
+    order_total: eventData.total ?? 0,
+    order_subtotal: eventData.subtotal ?? 0,
   };
 }
 
 /**
- * Builds customer attributes for Customer.io identify call
+ * Builds customer attributes for Customer.io identify call (includes tickets, upsellings, custom_fields)
  */
 function buildCustomerAttributes(
   eventData: any,
@@ -299,13 +418,7 @@ function buildCustomerAttributes(
 ) {
   const event = eventData.events || {};
 
-  // Build order items array with details
-  const orderItemsArr = (orderItems || []).map((item: any) => ({
-    ticketTypeName: item.ticket_type_name || item.ticket_types?.name || "",
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    subtotal: item.subtotal,
-  }));
+  const orderItemsArr = (orderItems || []).map(normalizeOrderItemForCustomerIO);
 
   // Extract form responses
   const formResponses = eventData.form_submissions?.responses || null;
@@ -448,6 +561,30 @@ async function sendConfirmationEmail(
         orderId,
       );
 
+      // Ensure both form_responses and order_items are present in attributes
+      // form_responses can be null if no form submission exists, but should be explicitly set
+      if (!('form_responses' in customerAttributes)) {
+        customerAttributes.form_responses = null;
+      }
+      
+      // order_items should always be an array, even if empty
+      if (!('order_items' in customerAttributes)) {
+        customerAttributes.order_items = [];
+      }
+
+      console.log("[DEBUG] Customer attributes before Customer.io sync (confirmPayment):", {
+        orderId,
+        customer_email: eventData.customer_email,
+        order_status: customerAttributes.order_status,
+        form_responses: customerAttributes.form_responses,
+        has_form_responses: !!customerAttributes.form_responses,
+        order_items: customerAttributes.order_items,
+        has_order_items: !!customerAttributes.order_items && customerAttributes.order_items.length > 0,
+        order_items_count: customerAttributes.order_items?.length || 0,
+        phone: customerAttributes.phone,
+        preferred_channel: customerAttributes.preferred_channel,
+      });
+
       const identifyResult = await identifyCustomer(
         {
           siteId: event.customerio_site_id,
@@ -462,6 +599,13 @@ async function sendConfirmationEmail(
           "Customer identified successfully in Customer.io:",
           eventData.customer_email,
         );
+        console.log("[DEBUG] Confirmed attributes saved to Customer.io (confirmPayment):", {
+          orderId,
+          customer_email: eventData.customer_email,
+          order_status: customerAttributes.order_status,
+          form_responses_saved: !!customerAttributes.form_responses,
+          order_items_saved: customerAttributes.order_items?.length || 0,
+        });
       } else {
         console.warn("Customer.io identify failed:", identifyResult.error);
       }
@@ -505,7 +649,7 @@ async function handlePaymentFailure(
   }
 
   // Update order status to FAILED
-  await updateOrderStatus(orderId, "FAILED", null, supabaseClient);
+  await updateOrderStatus(orderId, "FAILED", null, supabaseClient, null);
 
   throw new Error(`Payment verification failed: ${paymentError.message}`);
 }
@@ -538,6 +682,9 @@ export async function confirmFreePayment(
 
     // Step 3: Update ticket inventory
     const orderItems = await updateTicketInventory(orderId, supabaseClient);
+
+    // Step 3.2: Update upselling sold count
+    await updateUpsellingSold(orderId, supabaseClient);
 
     // Step 3.5: Update discount code usage if applicable
     await updateDiscountCodeUsage(orderId, supabaseClient);
@@ -598,6 +745,12 @@ export async function confirmPayment(
   try {
     // Step 1: Get order details (including event's AccruPay environment setting)
     const order = await getOrderDetails(orderId, supabaseClient);
+    console.log("[ACCRUPAY][confirmPayment] Loaded order for confirmation:", {
+      orderId,
+      status: order.status,
+      eventId: order.event_id,
+      payment_intent_id: order.payment_intent_id,
+    });
 
     // Select the appropriate AccruPay client based on event configuration
     const accruPay = selectAccruPayClient(
@@ -605,10 +758,14 @@ export async function confirmPayment(
       order.events?.accrupay_environment || null,
       envTag,
     );
+    console.log("[ACCRUPAY][confirmPayment] AccruPay client selected");
 
     const selectedEnv = order.events?.accrupay_environment || "default";
     console.log(
-      `Using AccruPay environment for confirmation: ${selectedEnv} (ENV_TAG: ${envTag})`,
+      "[ACCRUPAY][confirmPayment] Using environment for confirmation:",
+      selectedEnv,
+      "ENV_TAG:",
+      envTag,
     );
 
     // Step 2: Verify payment with Accrupay
@@ -617,6 +774,14 @@ export async function confirmPayment(
       accruPay,
       envTag,
     );
+    console.log("[ACCRUPAY][confirmPayment] Verified transaction:", {
+      id: verifiedTransaction.id,
+      status: verifiedTransaction.status,
+      paymentMethodId:
+        verifiedTransaction.paymentMethod?.id ??
+        verifiedTransaction.paymentMethodId ??
+        null,
+    });
 
     if (verifiedTransaction.status !== "SUCCEEDED") {
       throw new Error(
@@ -624,48 +789,23 @@ export async function confirmPayment(
       );
     }
 
-    // Step 3: Update order status to PAID
+    // Extract stored payment method id when available
+    const paymentMethodId =
+      verifiedTransaction.paymentMethod?.id ??
+      verifiedTransaction.paymentMethodId ??
+      null;
+
+    // Step 3: Update order status to PAID (and persist paymentMethodId)
     await updateOrderStatus(
       orderId,
       "PAID",
       verifiedTransaction.id,
       supabaseClient,
+      paymentMethodId,
     );
 
-    // Step 4: Update ticket inventory
-    const orderItems = await updateTicketInventory(orderId, supabaseClient);
-
-    // Step 4.5: Update discount code usage if applicable
-    await updateDiscountCodeUsage(orderId, supabaseClient);
-
-    // Step 5: Send Slack notification if webhook is configured
-    const slackWebhookUrl = order.events?.slack_webhook_url;
-    if (slackWebhookUrl) {
-      // Fetch full order data with event and order items for Slack notification
-      const { data: fullOrder } = await supabaseClient
-        .from("orders")
-        .select(
-          "*, events(title), order_items(*, ticket_types(name)), discount_codes(code, type, value)",
-        )
-        .eq("id", orderId)
-        .maybeSingle();
-
-      if (fullOrder) {
-        sendSlackNotification(slackWebhookUrl, fullOrder).catch((error) => {
-          console.warn(
-            "Failed to send Slack notification on payment confirmation:",
-            error,
-          );
-        });
-      }
-    }
-
-    // Step 6: Send confirmation email
-    const triggerData = await sendConfirmationEmail(
-      orderId,
-      orderItems,
-      supabaseClient,
-    );
+    // Step 4–7: inventory, upsellings sold, discount usage, Slack, email
+    const triggerData = await runPostPaymentSteps(orderId, order, supabaseClient);
 
     return {
       data: {
@@ -675,6 +815,7 @@ export async function confirmPayment(
       },
     };
   } catch (paymentError: any) {
+    console.error("Payment error:", paymentError);
     await handlePaymentFailure(orderId, paymentError, supabaseClient);
     // handlePaymentFailure throws, so this line won't be reached
     // but TypeScript doesn't know that, so we need a return statement

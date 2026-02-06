@@ -21,6 +21,9 @@ export const $events = Signal({
 export const $tickets = Signal({
   list: [],
 });
+export const $upsellings = Signal({
+  list: [],
+});
 export const $discounts = Signal({
   list: [],
 });
@@ -38,13 +41,18 @@ export const $dashboard = Signal({
 export const $embed = Signal({
   form: null,
   tickets: [],
+  upsellings: [],
   formData: {},
   selectedTickets: {},
+  selectedUpsellings: {},
+  upsellingCustomFields: {}, // { [upsellingId]: [ { [fieldLabel]: value }, ... ] } per-unit when custom_fields
   discountCode: '',
   appliedDiscount: null,
   totals: { subtotal: 0, discount_amount: 0, total: 0 },
   error: null,
   isFormValid: false,
+  order: null,
+  paymentSession: null,
 });
 export const $checkout = Signal({
   order: null,

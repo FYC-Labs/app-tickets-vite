@@ -67,3 +67,65 @@
 .nav-pills .nav-link {
   border-radius: 50rem !important;
 }
+
+.form-edit-modal-wider {
+  max-width: min(1600px, 98vw);
+}
+
+// Small inline checkboxes on dark tables (Upsellings Include column)
+.form-edit-modal-wider .upselling-include-toggle {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0.25rem;
+  border: 1px solid $grey-300;
+  background-color: transparent;
+  box-shadow: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: $white;
+}
+
+.form-edit-modal-wider .upselling-include-toggle.is-checked {
+  background-color: $primary-500;
+  border-color: $primary-500;
+}
+
+.form-edit-modal-wider .upselling-include-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+// Inline-edit tables (Tickets / Upsellings tabs): darker background, visible borders, clear section split
+.form-edit-modal-wider .form-edit-inline-table {
+  --bs-table-border-color: #{$grey-300};
+  tbody tr.inline-edit-row {
+    background-color: $primary-100;
+  }
+  tbody tr.inline-edit-custom-fields-row {
+    background-color: $primary-200;
+    border-top: 2px solid $primary-500;
+    td {
+      padding-top: 16px !important;
+    }
+    .form-edit-custom-fields-label {
+      color: $primary-900;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid $primary-500;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      display: block;
+    }
+  }
+  // Action buttons (Cancel/Save, Edit/Delete): remove glow
+  .form-edit-inline-actions .btn {
+    box-shadow: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    &:hover,
+    &:focus-visible {
+      box-shadow: none;
+    }
+  }
+}

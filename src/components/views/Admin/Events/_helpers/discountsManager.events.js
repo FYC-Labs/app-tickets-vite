@@ -52,6 +52,24 @@ export const handleOpenModal = (discount = null) => {
   }
 };
 
+/** Loads discount into form for inline editing (e.g. in FormEditModal Discounts tab). Does NOT set showModal. */
+export const loadDiscountFormForInline = (discount = null) => {
+  if (discount) {
+    $discountUI.update({ editingDiscount: discount });
+    $discountForm.update({
+      code: discount.code,
+      type: discount.type,
+      value: discount.value,
+      max_uses: discount.max_uses || '',
+      expires_at: discount.expires_at ? new Date(discount.expires_at).toISOString().slice(0, 16) : '',
+      is_active: discount.is_active,
+    });
+  } else {
+    $discountUI.update({ editingDiscount: null });
+    $discountForm.reset();
+  }
+};
+
 export const handleCloseModal = () => {
   $discountUI.update({
     showModal: false,
@@ -66,7 +84,7 @@ export const handleChange = (e) => {
   });
 };
 
-export const handleSubmit = async (e, eventId) => {
+export const handleSubmit = async (e, eventId, onUpdate) => {
   e.preventDefault();
 
   try {
@@ -92,29 +110,41 @@ export const handleSubmit = async (e, eventId) => {
     }
 
     handleCloseModal();
-    loadDiscounts(eventId);
+    if (typeof onUpdate === 'function') {
+      await onUpdate();
+    } else {
+      await loadDiscounts(eventId);
+    }
   } catch (error) {
     showToast('Error saving discount', 'error');
   }
 };
 
-export const handleDelete = async (id, eventId) => {
+export const handleDelete = async (id, eventId, onUpdate) => {
   if (!window.confirm('Are you sure you want to delete this discount code?')) return;
 
   try {
     await discountsAPI.delete(id);
     showToast('Discount deleted successfully', 'success');
-    loadDiscounts(eventId);
+    if (typeof onUpdate === 'function') {
+      onUpdate();
+    } else {
+      await loadDiscounts(eventId);
+    }
   } catch (error) {
     showToast('Error deleting discount', 'error');
   }
 };
 
-export const handleToggleActive = async (discount, eventId) => {
+export const handleToggleActive = async (discount, eventId, onUpdate) => {
   try {
     await discountsAPI.update(discount.id, { is_active: !discount.is_active });
     showToast(`Discount ${!discount.is_active ? 'activated' : 'deactivated'}`, 'success');
-    loadDiscounts(eventId);
+    if (typeof onUpdate === 'function') {
+      onUpdate();
+    } else {
+      await loadDiscounts(eventId);
+    }
   } catch (error) {
     showToast('Error updating discount', 'error');
   }

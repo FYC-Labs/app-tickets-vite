@@ -377,6 +377,7 @@ export const edgeFunctionHelpers = {
     createPaymentSession: (orderId) => callEdgeFunction('payments', {
       method: 'POST',
       body: { action: 'createPaymentSession', orderId },
+      timeout: 60000, // 60 seconds - AccruPay session creation can take longer
     }),
     confirmFreePayment: (orderId) => callEdgeFunction('payments', {
       method: 'POST',

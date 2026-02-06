@@ -2,15 +2,16 @@
 /* eslint-disable consistent-return */
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card, Button } from 'react-bootstrap';
+import { Card, Button, Form } from 'react-bootstrap';
 import { AccruPay } from 'accru-pay-react';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import Loader from '@src/components/global/Loader';
+import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import paymentsAPI from '@src/api/payments.api';
 import { postCheckoutUpsellings } from './_helpers/checkout.consts';
 import { loadPostCheckoutUpsellings } from './_helpers/checkout.resolvers';
-import { handlePaymentSuccess, goToOrderConfirmation, handleFreeOrderComplete, loadFormData, createOrderForPayment } from './_helpers/eventForm.events';
+import { handlePaymentSuccess, goToOrderConfirmation, handleFreeOrderComplete, loadFormData, createOrderForPayment, handleApplyDiscount, updateDiscountCode } from './_helpers/eventForm.events';
 import Step1Checkout from './_components/Step1Checkout';
 import Step2Upsellings from './_components/Step2Upsellings';
 import Step3UpsellingsPost from './_components/Step3UpsellingsPost';
@@ -18,7 +19,7 @@ import CreditCardForm from './_components/CreditCardForm';
 
 function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   const [searchParams] = useSearchParams();
-  const { isLoading, order, form, paymentSession } = $embed.value;
+  const { isLoading, order, form, paymentSession, discountCode, appliedDiscount } = $embed.value;
   const [currentStep, setCurrentStep] = useState(1);
   const [postCheckoutLoaded, setPostCheckoutLoaded] = useState(false);
   // Use ref to track currentStep to avoid stale closures in useEffectAsync
@@ -248,6 +249,37 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                   }
                 />
               </AccruPay>
+
+              {/* Discount Code Section */}
+              {form?.show_discount_code !== false && (
+                <div className="mt-24">
+                  <Form.Label>Discount Code</Form.Label>
+                  <div className="d-flex gap-2">
+                    <UniversalInput
+                      type="text"
+                      name="discountCode"
+                      placeholder="Enter code"
+                      value={discountCode || ''}
+                      customOnChange={(e) => updateDiscountCode(e.target.value.toUpperCase())}
+                      className="flex-grow-1"
+                      style={{ minWidth: 0 }}
+                    />
+                    <Button
+                      variant="dark"
+                      onClick={() => handleApplyDiscount(formId, eventId)}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {appliedDiscount && (
+                    <small className="text-success d-block mt-8">
+                      Discount applied: {appliedDiscount.code}
+                    </small>
+                  )}
+                </div>
+              )}
+
               {currentStep === 1 && (
                 <Button
                   variant="dark"

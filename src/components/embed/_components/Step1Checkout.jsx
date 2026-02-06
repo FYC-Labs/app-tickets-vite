@@ -6,8 +6,6 @@ import paymentsAPI from '@src/api/payments.api';
 import {
   handleFieldChange,
   handleTicketChange,
-  handleApplyDiscount,
-  updateDiscountCode,
   createOrderForPayment,
 } from '../_helpers/eventForm.events';
 
@@ -17,8 +15,6 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
     error,
     formData,
     selectedTickets,
-    discountCode,
-    appliedDiscount,
     totals,
     isFormValid,
   } = $embed.value;
@@ -170,35 +166,6 @@ function Step1Checkout({ formId, eventId, onPlaceOrder }) {
                 </Card>
               );
             })}
-
-            {form?.show_discount_code !== false && (
-              <div className="mb-24">
-                <Form.Label>Discount Code</Form.Label>
-                <UniversalInput
-                  type="text"
-                  name="discountCode"
-                  placeholder="Enter code"
-                  value={discountCode}
-                  customOnChange={(e) => updateDiscountCode(e.target.value.toUpperCase())}
-                  className="flex-grow-1"
-                  style={{ minWidth: 0 }}
-                />
-                <div className="mt-8">
-                  <Button
-                    variant="dark"
-                    onClick={() => handleApplyDiscount(formId, eventId)}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    Apply
-                  </Button>
-                </div>
-                {appliedDiscount && (
-                  <small className="text-success">
-                    Discount applied: {appliedDiscount.code}
-                  </small>
-                )}
-              </div>
-            )}
 
             {totals.subtotal > 0 && (
               <Card className="bg-transparent border-0">

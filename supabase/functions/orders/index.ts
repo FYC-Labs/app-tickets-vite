@@ -166,7 +166,10 @@ Deno.serve(async (req: Request) => {
                 `
               id,
               form_id,
-              submission_data,
+              responses,
+              email,
+              order_id,
+              created_at,
               forms(*)
             `,
               )

@@ -68,6 +68,12 @@ function OrderItemsSummary({ order }) {
           </div>
         );
       })}
+      {order.discount_amount > 0 && (
+        <div className="d-flex justify-content-between mt-8 small text-success">
+          <span>Discount {order.discount_codes?.code ? `(${order.discount_codes.code})` : ''}:</span>
+          <span>-${parseFloat(order.discount_amount).toFixed(2)}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -74,25 +74,10 @@ async function verifyPaymentTransaction(
     };
   }
 
-  console.log("[ACCRUPAY][confirmPayment] Verifying client payment session", {
-    payment_intent_id: order.payment_intent_id,
-    envTag,
-  });
-
   // NPM docs 0.15: clientSessions.payments.verify({ id }) — replaces verifyClientPaymentSession
   const result = await accruPay.transactions.clientSessions.payments.verify({
     id: order.payment_intent_id,
   });
-
-  console.log(
-    "[ACCRUPAY][confirmPayment] clientSessions.payments.verify result:",
-    {
-      id: result.id,
-      status: result.status,
-      hasPaymentMethod: !!result.paymentMethod,
-      paymentMethodId: result.paymentMethod?.id ?? result.paymentMethodId,
-    },
-  );
 
   return result;
 }
@@ -254,7 +239,6 @@ export async function runPostPaymentSteps(
     }
   }
 
-  console.log("[Customer.io] Sending confirmation email", fullOrderItems);
   const triggerData = await sendConfirmationEmail(
     orderId,
     fullOrderItems ?? [],
@@ -331,7 +315,7 @@ async function getEventAndOrderData(orderId: string, supabaseClient: any) {
 
     // Fetch form_submissions separately to avoid relationship ambiguity
     let formSubmission = null;
-    
+
     if (eventData.form_submission_id) {
       const { data: submission, error: submissionError } = await supabaseClient
         .from("form_submissions")
@@ -566,24 +550,11 @@ async function sendConfirmationEmail(
       if (!('form_responses' in customerAttributes)) {
         customerAttributes.form_responses = null;
       }
-      
+
       // order_items should always be an array, even if empty
       if (!('order_items' in customerAttributes)) {
         customerAttributes.order_items = [];
       }
-
-      console.log("[DEBUG] Customer attributes before Customer.io sync (confirmPayment):", {
-        orderId,
-        customer_email: eventData.customer_email,
-        order_status: customerAttributes.order_status,
-        form_responses: customerAttributes.form_responses,
-        has_form_responses: !!customerAttributes.form_responses,
-        order_items: customerAttributes.order_items,
-        has_order_items: !!customerAttributes.order_items && customerAttributes.order_items.length > 0,
-        order_items_count: customerAttributes.order_items?.length || 0,
-        phone: customerAttributes.phone,
-        preferred_channel: customerAttributes.preferred_channel,
-      });
 
       const identifyResult = await identifyCustomer(
         {
@@ -595,17 +566,6 @@ async function sendConfirmationEmail(
       );
 
       if (identifyResult.success) {
-        console.log(
-          "Customer identified successfully in Customer.io:",
-          eventData.customer_email,
-        );
-        console.log("[DEBUG] Confirmed attributes saved to Customer.io (confirmPayment):", {
-          orderId,
-          customer_email: eventData.customer_email,
-          order_status: customerAttributes.order_status,
-          form_responses_saved: !!customerAttributes.form_responses,
-          order_items_saved: customerAttributes.order_items?.length || 0,
-        });
       } else {
         console.warn("Customer.io identify failed:", identifyResult.error);
       }
@@ -745,12 +705,6 @@ export async function confirmPayment(
   try {
     // Step 1: Get order details (including event's AccruPay environment setting)
     const order = await getOrderDetails(orderId, supabaseClient);
-    console.log("[ACCRUPAY][confirmPayment] Loaded order for confirmation:", {
-      orderId,
-      status: order.status,
-      eventId: order.event_id,
-      payment_intent_id: order.payment_intent_id,
-    });
 
     // Select the appropriate AccruPay client based on event configuration
     const accruPay = selectAccruPayClient(
@@ -758,15 +712,8 @@ export async function confirmPayment(
       order.events?.accrupay_environment || null,
       envTag,
     );
-    console.log("[ACCRUPAY][confirmPayment] AccruPay client selected");
 
     const selectedEnv = order.events?.accrupay_environment || "default";
-    console.log(
-      "[ACCRUPAY][confirmPayment] Using environment for confirmation:",
-      selectedEnv,
-      "ENV_TAG:",
-      envTag,
-    );
 
     // Step 2: Verify payment with Accrupay
     const verifiedTransaction = await verifyPaymentTransaction(
@@ -774,14 +721,6 @@ export async function confirmPayment(
       accruPay,
       envTag,
     );
-    console.log("[ACCRUPAY][confirmPayment] Verified transaction:", {
-      id: verifiedTransaction.id,
-      status: verifiedTransaction.status,
-      paymentMethodId:
-        verifiedTransaction.paymentMethod?.id ??
-        verifiedTransaction.paymentMethodId ??
-        null,
-    });
 
     if (verifiedTransaction.status !== "SUCCEEDED") {
       throw new Error(

@@ -65,7 +65,7 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
 
   const [imagesUploading, setImagesUploading] = useState(false);
   const [uploadingPreviews, setUploadingPreviews] = useState([]); // [{ file, objectUrl }]
-  const [signedImageUrls, setSignedImageUrls] = useState({}); // { publicUrl -> signedUrl }
+  const [$signedImageUrls, setSignedImageUrls] = useState({}); // { publicUrl -> signedUrl }
   const [failedImageUrls, setFailedImageUrls] = useState({});
   const imageInputRef = useRef(null);
 
@@ -95,7 +95,7 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
       setSignedImageUrls({ ...fallbacks, ...Object.fromEntries(pairs) });
     });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageUrlsKey]);
 
   const handleImageSelect = async (e) => {
@@ -177,12 +177,11 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
                       <button
                         type="button"
                         className={
-                          `upselling-include-toggle ${
-                            ($formManagerForm.value.available_upselling_ids || [])
-                              .map(String)
-                              .includes(String($upsellingUI.value.editingUpselling.id))
-                              ? 'is-checked'
-                              : ''
+                          `upselling-include-toggle ${($formManagerForm.value.available_upselling_ids || [])
+                            .map(String)
+                            .includes(String($upsellingUI.value.editingUpselling.id))
+                            ? 'is-checked'
+                            : ''
                           }`
                         }
                         onClick={() => handleUpsellingSelection($upsellingUI.value.editingUpselling.id)}
@@ -191,8 +190,8 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
                         {($formManagerForm.value.available_upselling_ids || [])
                           .map(String)
                           .includes(String($upsellingUI.value.editingUpselling.id)) && (
-                          <FontAwesomeIcon icon={faCheck} size="xs" />
-                        )}
+                            <FontAwesomeIcon icon={faCheck} size="xs" />
+                          )}
                       </button>
                     )}
                   </td>
@@ -444,7 +443,7 @@ function FormEditModalUpsellingsTab({ upsellings, eventId, onUpdate }) {
                     <div className="form-edit-custom-fields-label small mb-8">Images</div>
                     <div className="d-flex flex-wrap gap-2 align-items-start mb-8">
                       {(formData.images || []).map((url, idx) => {
-                        const displayUrl = failedImageUrls[url] ? url : (signedImageUrls[url] || url);
+                        const displayUrl = failedImageUrls[url] ? url : ($signedImageUrls[url] || url);
                         const handleRemove = async () => {
                           if (url?.includes('upselling-images')) {
                             try {

@@ -68,7 +68,7 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
   }
 
   let formSubmission = null;
-  
+
   if (orderData.form_submission_id) {
     const { data: submission, error: submissionError } = await supabaseClient
       .from("form_submissions")
@@ -240,24 +240,11 @@ export async function syncOrderStatusToCustomerIO(
     if (!('form_responses' in customerAttributes)) {
       customerAttributes.form_responses = null;
     }
-    
+
     // order_items should always be an array, even if empty
     if (!('order_items' in customerAttributes)) {
       customerAttributes.order_items = [];
     }
-
-    console.log("[DEBUG] Customer attributes before Customer.io sync:", {
-      orderId,
-      customer_email: orderData.customer_email,
-      order_status: customerAttributes.order_status,
-      form_responses: customerAttributes.form_responses,
-      has_form_responses: !!customerAttributes.form_responses,
-      order_items: customerAttributes.order_items,
-      has_order_items: !!customerAttributes.order_items && customerAttributes.order_items.length > 0,
-      order_items_count: customerAttributes.order_items?.length || 0,
-      phone: customerAttributes.phone,
-      preferred_channel: customerAttributes.preferred_channel,
-    });
 
     const identifyResult = await identifyCustomer(
       {
@@ -269,16 +256,6 @@ export async function syncOrderStatusToCustomerIO(
     );
 
     if (identifyResult.success) {
-      console.log(
-        `Order status synced to Customer.io for order ${orderId}, customer ${orderData.customer_email}, status: ${orderData.status}`,
-      );
-      console.log("[DEBUG] Confirmed attributes saved to Customer.io:", {
-        orderId,
-        customer_email: orderData.customer_email,
-        order_status: customerAttributes.order_status,
-        form_responses_saved: !!customerAttributes.form_responses,
-        order_items_saved: customerAttributes.order_items?.length || 0,
-      });
       return { success: true };
     } else {
       console.warn(

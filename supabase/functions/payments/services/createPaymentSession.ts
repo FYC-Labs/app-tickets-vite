@@ -88,13 +88,6 @@ export async function createPaymentSession(
   );
 
   const selectedEnv = order.events?.accrupay_environment || "default";
-  console.log(
-    "[ACCRUPAY][createPaymentSession] Using environment:",
-    selectedEnv,
-    "ENV_TAG:",
-    envTag,
-  );
-
 
   if (order.status !== "PENDING") {
     throw new Error(`Order status is ${order.status}, cannot create payment session`);
@@ -103,13 +96,6 @@ export async function createPaymentSession(
   // Create payment session with Accrupay/Nuvei
   try {
     const amountInCents = Math.round(parseFloat(order.total) * 100);
-
-    console.log("[ACCRUPAY][createPaymentSession] Creating client session", {
-      orderId,
-      status: order.status,
-      amountInCents,
-      customerEmail: order.customer_email,
-    });
 
     const sessionData = {
       transactionProvider: TRANSACTION_PROVIDER.NUVEI,
@@ -134,24 +120,11 @@ export async function createPaymentSession(
       },
     };
 
-    console.log(
-      "[ACCRUPAY][createPaymentSession] Session data payload:",
-      JSON.stringify(sessionData, null, 2),
-    );
-
     // @accrupay/node 0.15+: clientSessions.payments.start (was startClientPaymentSession)
     const session = await accruPay.transactions.clientSessions.payments.start(
       sessionData,
     );
     const transaction = session?.transaction ?? session;
-    console.log(
-      "[ACCRUPAY][createPaymentSession] Client payment session created:",
-      {
-        transactionId: transaction?.id ?? session?.id,
-        token: transaction?.token ?? session?.token,
-        status: transaction?.status ?? session?.status,
-      },
-    );
 
     // Pre-session config for React SDK (npm docs: clientSessions.getBaseConfig)
     // Output: { provider: 'NUVEI', data: { merchantId, environment, ... } }
@@ -166,15 +139,8 @@ export async function createPaymentSession(
         environment: config.data?.environment ?? config.data?.env,
         env: config.data?.environment ?? config.data?.env,
       };
-      console.log(
-        "[ACCRUPAY][createPaymentSession] Base config loaded:",
-        preSessionData.env ?? preSessionData.environment,
-      );
     } catch (configError) {
-      console.warn(
-        "[ACCRUPAY][createPaymentSession] Could not fetch getBaseConfig:",
-        configError,
-      );
+      console.warn("Could not fetch getBaseConfig:", configError);
     }
 
     // Store session information in order

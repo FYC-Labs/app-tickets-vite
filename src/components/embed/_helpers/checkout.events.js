@@ -1,6 +1,7 @@
+/* eslint-disable no-nested-ternary */
 import { $checkout } from '@src/signals';
 import paymentsAPI from '@src/api/payments.api';
-import { isProcessingPayment, showTestCards, selectedPostCheckoutUpsellings, postCheckoutUpsellingCustomFields, isAddingUpsellings, postCheckoutUpsellings } from './checkout.consts';
+import { isProcessingPayment, showTestCards, selectedPostCheckoutUpsellings, postCheckoutUpsellingCustomFields, isAddingUpsellings, postCheckoutUpsellings, paymentSubmitBtnRef } from './checkout.consts';
 
 // Build URL with order details as query parameters
 const buildConfirmationUrl = (baseUrl, order) => {

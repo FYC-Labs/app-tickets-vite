@@ -43,6 +43,7 @@
     "react-router-dom": "^6.21.2",
     "react-select": "^5.10.0",
     "sass": "1.35.1",
+    "uuid": "^13.0.0",
     "vite-plugin-svgr": "^4.2.0",
     "yalc": "^1.0.0-pre.53"
   },

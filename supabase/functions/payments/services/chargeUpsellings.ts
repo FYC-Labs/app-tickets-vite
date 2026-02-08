@@ -128,7 +128,6 @@ export async function chargeUpsellingsWithStoredMethod(
   );
 
   const selectedEnv = order.events?.accrupay_environment || "default";
-  console.log("[ACCRUPAY][chargeUpsellings] Using environment:", selectedEnv, "ENV_TAG:", envTag);
 
   // 4) Charge using stored payment method (docs: sdk.transactions.payments.paymentMethod.charge)
   const merchantInternalTransactionCode = `${order.id}-upsell-${Date.now()}`;
@@ -139,13 +138,6 @@ export async function chargeUpsellingsWithStoredMethod(
       "AccruPay charge API not available (transactions.payments.paymentMethod.charge). Check @accrupay/node@0.15.1 exports.",
     );
   }
-
-  console.log("[ACCRUPAY][chargeUpsellings] Charging stored payment method", {
-    orderId,
-    paymentMethodId: order.paymentMethodId,
-    amountInCents,
-    merchantInternalTransactionCode,
-  });
 
   const country = COUNTRY_ISO_2.US;
   const chargePayload = {
@@ -177,8 +169,6 @@ export async function chargeUpsellingsWithStoredMethod(
     chargeResult?.data ?? chargeResult?.transaction ?? chargeResult ?? {};
   const status = charge.status ?? chargeResult?.status;
   const id = charge.id ?? chargeResult?.id;
-
-  console.log("[ACCRUPAY][chargeUpsellings] Charge result:", { id, status });
 
   if (status !== "SUCCEEDED") {
     throw new Error(`Upsellings charge failed: ${status ?? "unknown"}`);

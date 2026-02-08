@@ -1,13 +1,14 @@
-import { useMemo, memo } from 'react';
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useMemo, memo, useEffect } from 'react';
 import { Form, Row, Col } from 'react-bootstrap';
 import { form } from 'accru-pay-react';
 import CardLoader from '@src/components/global/CardLoader';
-import { isProcessingPayment } from '../_helpers/checkout.consts';
+import { isProcessingPayment, paymentSubmitBtnRef } from '../_helpers/checkout.consts';
 import * as events from '../_helpers/checkout.events';
 
 const PAYMENT_PROCESSOR = 'nuvei';
 
-const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, showSubmitButton = true, showCardFields = true }) => {
+const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, showSubmitButton = false, showCardFields = true }) => {
   // Keep the same form instance across renders to preserve AccruPay state
   const AccruPaymentForm = useMemo(() => form(PAYMENT_PROCESSOR), []);
   const submitButtonText = useMemo(
@@ -22,6 +23,15 @@ const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, 
       await events.handlePaymentSuccess(paymentData);
     }
   };
+
+  useEffect(() => {
+    const buttonElement = document.querySelector('[data-accrupay-submit-btn] button');
+    paymentSubmitBtnRef.value = buttonElement;
+
+    return () => {
+      paymentSubmitBtnRef.value = null;
+    };
+  }, []);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -106,23 +116,21 @@ const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, 
             </Row>
           </div>
 
-          {showSubmitButton && (
-            <div className="d-grid">
-              <AccruPaymentForm.SubmitBtn
-                className="btn btn-primary btn-lg"
-                text={submitButtonText}
-                onSubmit={() => {
-                  isProcessingPayment.value = true;
-                }}
-                onSuccess={handleSuccess}
-                onError={events.handlePaymentError}
-                onComplete={() => {
-                  isProcessingPayment.value = false;
-                }}
-                disabled={isProcessingPayment.value || submitDisabled}
-              />
-            </div>
-          )}
+          <div className="d-grid" data-accrupay-submit-btn style={{ display: showSubmitButton ? 'block' : 'none' }}>
+            <AccruPaymentForm.SubmitBtn
+              className="btn btn-dark btn-lg d-none"
+              text={submitButtonText}
+              onSubmit={() => {
+                isProcessingPayment.value = true;
+              }}
+              onSuccess={handleSuccess}
+              onError={events.handlePaymentError}
+              onComplete={() => {
+                isProcessingPayment.value = false;
+              }}
+              disabled={isProcessingPayment.value || submitDisabled}
+            />
+          </div>
         </Form>
       </div>
     </div>

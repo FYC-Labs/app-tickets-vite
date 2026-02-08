@@ -8,10 +8,6 @@ import {
   postCheckoutUpsellingCustomFields,
 } from '../_helpers/checkout.consts';
 import { loadPostCheckoutUpsellings } from '../_helpers/checkout.resolvers';
-import {
-  handlePostCheckoutUpsellingChange,
-  handlePostCheckoutUpsellingCustomFieldChange,
-} from '../_helpers/checkout.events';
 import { getUpsellingDiscountAmount } from '../_helpers/eventForm.events';
 import EmbedUpsellingsList from './EmbedUpsellingsList';
 import OrderSummary from './OrderSummary';
@@ -123,11 +119,6 @@ function Step3UpsellingsPost() {
 
   const syncError = $checkout.value?.error;
 
-  // Adapter: EmbedUpsellingsList uses (upsellingId, unitIndex, fieldLabel, value)
-  const onCustomFieldChange = (upsellingId, unitIndex, fieldLabel, value) => {
-    handlePostCheckoutUpsellingCustomFieldChange(upsellingId, unitIndex, fieldLabel, value);
-  };
-
   if (!order) {
     return null;
   }
@@ -143,15 +134,7 @@ function Step3UpsellingsPost() {
 
       {upsellings && upsellings.length > 0 ? (
         <>
-          <EmbedUpsellingsList
-            upsellings={upsellings}
-            selectedUpsellings={selected || {}}
-            onUpsellingChange={handlePostCheckoutUpsellingChange}
-            upsellingCustomFields={customFields || {}}
-            onUpsellingCustomFieldChange={onCustomFieldChange}
-            totalTicketsSelected={0}
-            form={form}
-          />
+          <EmbedUpsellingsList />
 
           {syncError && (
             <Alert variant="danger" className="mt-24">

@@ -47,6 +47,11 @@ export const ordersAPI = {
     return result.data;
   },
 
+  async update(orderId, items, upsellingDiscountAmount = 0, customerName = null, customerEmail = null) {
+    const result = await edgeFunctionHelpers.orders.update(orderId, items, upsellingDiscountAmount, customerName, customerEmail);
+    return result.data;
+  },
+
   async delete(id) {
     const result = await edgeFunctionHelpers.orders.delete(id);
     return result.data;

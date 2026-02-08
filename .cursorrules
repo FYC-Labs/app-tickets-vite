@@ -107,7 +107,7 @@ structure_generation:
 
           // Handles UI interactions, may trigger API calls
           export const handleClick = () => {
-            console.log("Event triggered");
+            console.info("Event triggered");
           };
 
       - file: "_helpers/resolvers.ts"

@@ -79,7 +79,6 @@ function OrderConfirmation() {
     try {
       $orderConfirmation.loadingStart();
       const orderData = await ordersAPI.getById(orderId);
-      console.log('orderData', orderData);
 
       if (!orderData) {
         throw new Error('Order not found. Please check your order link.');
@@ -224,7 +223,7 @@ function OrderConfirmation() {
             {order.form_submissions?.responses && order.form_submissions.forms && (() => {
               const { forms: form, responses } = order.form_submissions;
               const hasContactInfo = (form.request_phone_number && responses.phone_number) ||
-                                     (form.request_communication_preference && responses.preferred_channel);
+                (form.request_communication_preference && responses.preferred_channel);
               const hasSchemaInfo = form.schema && form.schema.some((field) => {
                 const key = field.field_id_string != null ? field.field_id_string : field.label;
                 return responses[key] && responses[key] !== '';

@@ -6,18 +6,29 @@ import ordersAPI from '@src/api/orders.api';
 import discountsAPI from '@src/api/discounts.api';
 import upsellingsAPI from '@src/api/upsellings.api';
 import paymentsAPI from '@src/api/payments.api';
+import { initializePaymentSession, fetchPaymentSession } from '@src/components/embed/_helpers/checkout.resolvers';
+import { paymentSubmitBtnRef } from '@src/components/embed/_helpers/checkout.consts';
 
 export const loadFormData = async (formId, eventId) => {
   try {
     $embed.loadingStart();
-    $embed.update({ error: null });
+    $embed.update({ error: null, currentStep: 'initial' });
 
     if (formId) {
-      const formData = await formsAPI.getById(formId);
-      $embed.update({ form: formData });
+      // Fetch providers and form data in parallel
+      const [providers, formData] = await Promise.all([
+        paymentsAPI.getProviders(),
+        formsAPI.getById(formId),
+      ]);
+      $embed.update({ providers, form: formData });
 
       if (formData.event_id) {
-        const ticketsData = await ticketsAPI.getByEventId(formData.event_id);
+        // Fetch tickets and upsellings in parallel
+        const [ticketsData, upsellingsData] = await Promise.all([
+          ticketsAPI.getByEventId(formData.event_id),
+          upsellingsAPI.getByEventId(formData.event_id),
+        ]);
+
         const now = new Date();
 
         let filtered = ticketsData || [];
@@ -33,26 +44,16 @@ export const loadFormData = async (formId, eventId) => {
           return start <= now && now <= end && available > 0;
         });
 
-        $embed.update({ tickets: filtered });
-
-        const upsellingsData = await upsellingsAPI.getByEventId(formData.event_id);
-        let filteredUpsellings = (upsellingsData || []).filter(
-          (u) => u.upselling_strategy === 'PRE-CHECKOUT',
-        );
-
-        if (formData && 'available_upselling_ids' in formData) {
-          if (formData.available_upselling_ids && Array.isArray(formData.available_upselling_ids) && formData.available_upselling_ids.length > 0) {
-            const availableIds = formData.available_upselling_ids.map(String);
-            filteredUpsellings = filteredUpsellings.filter((u) => availableIds.includes(String(u.id)));
-          } else {
-            filteredUpsellings = [];
-          }
-        }
-
-        $embed.update({ upsellings: filteredUpsellings });
+        $embed.update({ tickets: filtered, upsellings: upsellingsData });
       }
     } else if (eventId) {
-      const ticketsData = await ticketsAPI.getByEventId(eventId);
+      // Fetch providers and tickets in parallel
+      const [providers, ticketsData] = await Promise.all([
+        paymentsAPI.getProviders(),
+        ticketsAPI.getByEventId(eventId),
+      ]);
+      $embed.update({ providers });
+
       const now = new Date();
       const filtered = (ticketsData || []).filter((t) => {
         const start = new Date(t.sales_start);
@@ -61,6 +62,10 @@ export const loadFormData = async (formId, eventId) => {
         return start <= now && now <= end && available > 0;
       });
       $embed.update({ tickets: filtered });
+    } else {
+      // If neither formId nor eventId, still fetch providers
+      const providers = await paymentsAPI.getProviders();
+      $embed.update({ providers });
     }
   } catch (err) {
     $embed.update({ error: 'Error loading form' });
@@ -179,20 +184,26 @@ export const calculateTotals = () => {
   });
 };
 
-export const handleFieldChange = (fieldId, value, fieldIdString = null) => {
+export const handleFieldChange = async (fieldId, value, fieldIdString = null) => {
   const formData = { ...$embed.value.formData };
   const key = fieldIdString !== null ? fieldIdString : fieldId;
   formData[key] = value;
   $embed.update({ formData });
   checkFormValidity();
+  updateIsPayNowDisabled();
+
+  await createOrUpdateOrderAndInitializePayment();
 };
 
-export const handleTicketChange = (ticketId, quantity) => {
+export const handleTicketChange = async (ticketId, quantity) => {
   const selectedTickets = { ...$embed.value.selectedTickets };
   selectedTickets[ticketId] = parseInt(quantity, 10) || 0;
   $embed.update({ selectedTickets });
   calculateTotals();
   checkFormValidity();
+  updateIsPayNowDisabled();
+
+  await createOrUpdateOrderAndInitializePayment();
 };
 
 export const handleApplyDiscount = async (formId, eventId) => {
@@ -430,7 +441,84 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
   }
 };
 
-export const createOrderForPayment = async (formId, eventId) => {
+/**
+ * Creates or updates an order and initializes payment session when:
+ * - Tickets are selected/changed
+ * - Name or email is entered/changed
+ */
+export const createOrUpdateOrderAndInitializePayment = async () => {
+  try {
+    if ($embed.value.isPayNowDisabled) {
+      return;
+    }
+
+    if (!$embed.value.form?.event_id) {
+      return;
+    }
+    $embed.update({ isLoadingCCForm: true });
+
+    // If an order exists and is PENDING, try to update it; otherwise create new
+    let orderToUse = null;
+
+    if ($embed.value.order && $embed.value.order.status === 'PENDING') {
+      // Try to update existing pending order
+      try {
+        const { totals } = $embed.value;
+        const orderItems = Object.entries($embed.value.selectedTickets)
+          .filter(([, quantity]) => quantity > 0)
+          .map(([ticketId, quantity]) => {
+            const ticket = $embed.value.tickets.find((t) => t.id === ticketId);
+            return {
+              ticket_type_id: ticketId,
+              quantity,
+              unit_price: parseFloat(ticket.price),
+            };
+          });
+
+        // Don't update if there are no order items
+        if (orderItems.length === 0) {
+          return;
+        }
+
+        orderToUse = await ordersAPI.update(
+          $embed.value.order.id,
+          orderItems,
+          totals.discount_amount,
+          $embed.value.formData.name,
+          $embed.value.formData.email,
+        );
+      } catch (updateError) {
+        // If update fails, create a new order
+        orderToUse = null;
+      }
+    }
+
+    // Create new order if we don't have a valid updated one
+    if (!orderToUse) {
+      orderToUse = await createOrderForPayment(null, $embed.value.form?.event_id, true); // Skip form submission
+    }
+
+    if (orderToUse && orderToUse.id) {
+      try {
+        let sessionData = await fetchPaymentSession(orderToUse.id);
+        if (!sessionData) {
+          sessionData = await initializePaymentSession(orderToUse.id);
+        }
+        if (sessionData) {
+          $embed.update({ paymentSession: sessionData });
+        }
+      } catch (sessionError) {
+        console.error('Error fetching or initializing payment session:', sessionError);
+      }
+    }
+  } catch (err) {
+    console.error('Error creating or updating order and initializing payment:', err);
+  } finally {
+    $embed.update({ isLoadingCCForm: false });
+  }
+};
+
+export const createOrderForPayment = async (formId, eventId, skipFormSubmission = false) => {
   try {
     const { form, formData, selectedTickets, appliedDiscount, totals, tickets } = $embed.value;
 
@@ -451,7 +539,7 @@ export const createOrderForPayment = async (formId, eventId) => {
       });
 
     let submissionId = null;
-    if (form) {
+    if (form && !skipFormSubmission) {
       const {
         card_number: _cardNumber,
         card_cvc: _cardCvc,
@@ -734,4 +822,40 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null, op
     });
     throw err;
   }
+};
+
+export const updateIsPayNowDisabled = () => {
+  const hasName = $embed.value.formData.name && $embed.value.formData.name.trim() !== '';
+  const hasEmail = $embed.value.formData.email && $embed.value.formData.email.trim() !== '';
+  const hasTickets = Object.values($embed.value.selectedTickets).some((qty) => qty > 0);
+  $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets });
+};
+
+export const submitPaymentFormProgrammatically = () => {
+  if (paymentSubmitBtnRef.value) {
+    paymentSubmitBtnRef.value.click();
+  } else {
+    console.warn('Payment submit button ref not available');
+  }
+};
+
+export const handleClickPayNow = () => {
+  console.log('handleClickPayNow', $embed.value.currentStep);
+  if ($embed.value.currentStep === 'initial') {
+    if ($embed.value.upsellings.length > 0) {
+      $embed.update({ currentStep: 'upsell' });
+      return;
+    }
+    submitPaymentFormProgrammatically();
+    $embed.update({ currentStep: 'initial' });
+    return;
+  }
+
+  if ($embed.value.currentStep === 'upsell') {
+    submitPaymentFormProgrammatically();
+    $embed.update({ currentStep: 'initial' });
+    return;
+  }
+
+  $embed.update({ currentStep: 'initial' });
 };

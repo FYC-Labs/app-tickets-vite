@@ -1,4 +1,4 @@
-import { Card, Row, Col, Form, Image } from 'react-bootstrap';
+import { Row, Col, Form, Image } from 'react-bootstrap';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import { $embed } from '@src/signals';
@@ -65,91 +65,90 @@ export default function EmbedUpsellingCard({
   };
 
   return (
-    <Card
+    <div
       key={upselling.id}
-      className={`mb-16 border-0 ${isSelected ? 'selected' : ''} ${available === 0 ? 'sold-out' : ''}`}
+      className={`
+        mb-16
+        ${isSelected ? 'selected' : ''}
+        ${available === 0 ? 'sold-out' : ''}
+        p-16
+        bg-light-200
+        rounded
+      `}
       style={{ animationDelay: `${index * 0.1}s` }}
     >
-      <Card.Body className="p-0">
-        <Row className="align-items-center">
-          <Col md={$embed.value.form?.show_tickets_remaining !== false ? 6 : 9}>
-            <Row className="align-items-start">
-              {firstImageUrl && (
-                <Col xs="auto" className="pe-20">
-                  <Image
-                    src={$failedImageUrls.value[firstImageUrl] ? firstImageUrl : ($signedImageUrls.value[firstImageUrl] ?? firstImageUrl)}
-                    alt={upselling.item ?? upselling.name}
-                    rounded
-                    style={{
-                      width: 96,
-                      height: 96,
-                      objectFit: 'cover',
-                      imageOrientation: 'from-image',
-                    }}
-                    onError={() => markImageAsFailed(firstImageUrl)}
-                    loading="lazy"
-                  />
-                </Col>
-              )}
-              <Col>
-                <h6 className="mb-8">{upselling.item ?? upselling.name}</h6>
-                {upselling.description && (
-                  <p className="text-muted small mb-8">{upselling.description}</p>
-                )}
-                {upselling.benefits && (
-                  <div className="mb-8">
-                    <span className="benefits-label">Benefits:</span>
-                    <span className="benefits-text">{upselling.benefits}</span>
-                  </div>
-                )}
-                <div>
-                  <span className="price-currency">$</span>
-                  <span className="price-amount">{parseFloat(upselling.amount ?? upselling.price).toFixed(2)}</span>
-                </div>
+      <Row className="align-items-center">
+        <Col md={$embed.value.form?.show_tickets_remaining !== false ? 6 : 9}>
+          <Row className="align-items-start">
+            {firstImageUrl && (
+              <Col xs="auto" className="pe-20">
+                <Image
+                  src={$failedImageUrls.value[firstImageUrl] ? firstImageUrl : ($signedImageUrls.value[firstImageUrl] ?? firstImageUrl)}
+                  alt={upselling.item ?? upselling.name}
+                  rounded
+                  style={{
+                    width: 96,
+                    height: 96,
+                    objectFit: 'cover',
+                    imageOrientation: 'from-image',
+                  }}
+                  onError={() => markImageAsFailed(firstImageUrl)}
+                  loading="lazy"
+                />
               </Col>
-            </Row>
-          </Col>
-          <Col md={3}>
-            <Form.Label className="small fw-semibold mb-8">Quantity</Form.Label>
-            <UniversalInput
-              as="select"
-              name={`upselling_${upselling.id}`}
-              value={selectedQty}
-              customOnChange={(e) => handleUpsellingChange(upselling.id, Number(e.target.value))}
-              disabled={available === 0 || disabled}
-            >
-              {quantityOptions.map((n) => <option key={n} value={n}>{n}</option>)}
-            </UniversalInput>
-            {selectedQty > 0 && (
-              <div className="mt-8">
-                <small className="text-muted">Subtotal: </small>
-                <strong className="text-dark">
-                  ${(parseFloat(upselling.amount ?? upselling.price) * selectedQty).toFixed(2)}
-                </strong>
-              </div>
             )}
-          </Col>
-        </Row>
-        {selectedQty > 0 && hasCustomFields && (
-          <Row className="mt-16">
-            <Col md={12}>
-              <div className="border-top pt-16 mt-16">
-                <h6 className="small mb-16 fw-semibold">Additional Information</h6>
-                {Array.from({ length: selectedQty }, (_, unitIndex) => (
-                  <div key={`${upselling.id}_unit_${unitIndex}`} className="mb-24">
-                    {selectedQty > 1 && (
-                      <div className="small fw-semibold text-muted mb-8">
-                        {upselling.item ?? upselling.name} #{unitIndex + 1}
-                      </div>
-                    )}
-                    {upselling.custom_fields.map((field, idx) => renderUpsellingCustomField(field, upselling.id, unitIndex, idx))}
-                  </div>
-                ))}
+            <Col>
+              <h6 className="mb-8">{upselling.item ?? upselling.name}</h6>
+              {upselling.description && (
+                <p className="text-muted small mb-8">{upselling.description}</p>
+              )}
+              {upselling.benefits && (
+                <div className="mb-8">
+                  <span className="benefits-label">Benefits:</span>
+                  <span className="benefits-text">{upselling.benefits}</span>
+                </div>
+              )}
+              <div>
+                <span className="price-currency">$</span>
+                <span className="price-amount">{parseFloat(upselling.amount ?? upselling.price).toFixed(2)}</span>
               </div>
             </Col>
           </Row>
-        )}
-      </Card.Body>
-    </Card>
+        </Col>
+        <Col md={3}>
+          <Form.Label className="small fw-semibold mb-8">Quantity</Form.Label>
+          <UniversalInput
+            as="select"
+            name={`upselling_${upselling.id}`}
+            value={selectedQty}
+            customOnChange={(e) => handleUpsellingChange(upselling.id, Number(e.target.value))}
+            disabled={available === 0 || disabled}
+          >
+            {quantityOptions.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </UniversalInput>
+        </Col>
+      </Row>
+      {selectedQty > 0 && hasCustomFields && (
+        <Row className="mt-16">
+          <Col md={12}>
+            <div className="border-top pt-16 mt-16">
+              <h6 className="small mb-16 fw-semibold">Additional Information</h6>
+              {Array.from({ length: selectedQty }, (_, unitIndex) => (
+                <div key={`${upselling.id}_unit_${unitIndex}`} className="mb-24">
+                  {selectedQty > 1 && (
+                    <div className="small fw-semibold text-muted mb-8">
+                      {upselling.item ?? upselling.name} #{unitIndex + 1}
+                    </div>
+                  )}
+                  {upselling.custom_fields.map((field, idx) => renderUpsellingCustomField(field, upselling.id, unitIndex, idx))}
+                </div>
+              ))}
+            </div>
+          </Col>
+        </Row>
+      )}
+    </div>
   );
 }

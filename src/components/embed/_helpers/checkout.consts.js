@@ -18,3 +18,5 @@ export const providers = computed(() => {
   const { paymentSession } = $embed.value;
   return paymentSession?.preSessionData ? [{ name: 'nuvei', config: paymentSession.preSessionData }] : null;
 });
+
+export const $upsellTimer = signal(15);

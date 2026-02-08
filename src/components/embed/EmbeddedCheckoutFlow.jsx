@@ -8,7 +8,7 @@ import Loader from '@src/components/global/Loader';
 import { handleClickPayNow } from '@src/components/embed/_helpers/eventForm.events';
 import EmbedUpsellingsList from '@src/components/embed/_components/EmbedUpsellingsList';
 import EmbedOrderTotals from '@src/components/embed/_components/EmbedOrderTotals';
-import CardLoader from '@src/components/global/CardLoader';
+import { $upsellTimer } from '@src/components/embed/_helpers/checkout.consts';
 import { handlePaymentSuccess, goToOrderConfirmation, loadFormData, updateIsPayNowDisabled } from './_helpers/eventForm.events';
 import Step1Checkout from './_components/Step1Checkout';
 import EmbedPaymentDetails from './_components/EmbedPaymentDetails';
@@ -17,7 +17,6 @@ import DiscountCodeInput from './_components/DiscountCodeInput';
 function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   const [searchParams] = useSearchParams();
   const confirmationUrlOverride = searchParams.get('confirmationUrl');
-  const orderTotal = $embed.value.order != null ? parseFloat($embed.value.order?.total || 0) : null;
 
   const handlePaymentSuccessCallback = useCallback(
     async (paymentData) => {
@@ -29,7 +28,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
 
   useEffect(() => {
     updateIsPayNowDisabled();
-  }, [$embed.value.formData, $embed.value.order, $embed.value.selectedTickets, $embed.value.selectedUpsellings]);
+  }, [$embed.value.formData, $embed.value.order, $embed.value.selectedTickets, $embed.value.selectedUpsellings, $embed.value.isLoadingCCForm]);
 
   useEffectAsync(async () => {
     await loadFormData(formId, eventId);
@@ -53,11 +52,6 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
             theme={theme}
             onPlaceOrder={() => { }}
           />
-          {$embed.value.isLoadingCCForm && (
-            <div className="d-flex justify-content-center align-items-center">
-              <CardLoader message="Loading payment form..." />
-            </div>
-          )}
           {$embed.value.order && (
             <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
           )}
@@ -77,8 +71,11 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
           onClick={handleClickPayNow}
           disabled={$embed.value.isPayNowDisabled}
         >
-          Pay ${orderTotal?.toFixed(2)} Now
+          {$embed.value.currentStep === 'initial' ? 'Place Order' : 'Complete Checkout'}
         </Button>
+        {$embed.value.currentStep === 'upsell' && (
+          <div className="text-muted text-center mt-8">Auto-completes in {$upsellTimer.value} seconds</div>
+        )}
         <EmbedOrderTotals />
       </Card.Body>
     </Card>

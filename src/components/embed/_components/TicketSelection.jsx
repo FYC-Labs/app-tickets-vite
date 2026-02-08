@@ -12,7 +12,7 @@ export default function TicketSelection() {
   }
 
   return (
-    <div className="border-top border-bottom pt-16 pb-16">
+    <div className="p-16">
       {tickets.map((ticket, index) => {
         const available = ticket.quantity - (ticket.sold || 0);
         const selectedQty = selectedTickets[ticket.id] || 0;

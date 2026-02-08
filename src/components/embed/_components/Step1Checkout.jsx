@@ -16,7 +16,7 @@ function Step1Checkout() {
 
       {$embed.value.error && <Alert variant="danger">{$embed.value.error}</Alert>}
 
-      <Form>
+      <Form className="bg-light-200 rounded-15 p-16 mb-16">
         <Form.Group className="mb-24">
           <Row>
             <Col md={12} className="mb-16">

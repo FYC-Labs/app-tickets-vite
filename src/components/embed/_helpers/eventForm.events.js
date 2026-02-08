@@ -828,7 +828,9 @@ export const updateIsPayNowDisabled = () => {
   const hasName = $embed.value.formData.name && $embed.value.formData.name.trim() !== '';
   const hasEmail = $embed.value.formData.email && $embed.value.formData.email.trim() !== '';
   const hasTickets = Object.values($embed.value.selectedTickets).some((qty) => qty > 0);
-  $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets });
+  const isCcLoading = $embed.value.isLoadingCCForm;
+  console.log('updateIsPayNowDisabled', { hasName, hasEmail, hasTickets, isCcLoading });
+  $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets || isCcLoading });
 };
 
 export const submitPaymentFormProgrammatically = () => {
@@ -840,7 +842,6 @@ export const submitPaymentFormProgrammatically = () => {
 };
 
 export const handleClickPayNow = () => {
-  console.log('handleClickPayNow', $embed.value.currentStep);
   if ($embed.value.currentStep === 'initial') {
     if ($embed.value.upsellings.length > 0) {
       $embed.update({ currentStep: 'upsell' });

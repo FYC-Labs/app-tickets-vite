@@ -1,3 +1,5 @@
+/* eslint-disable consistent-return */
+/* eslint-disable react-hooks/exhaustive-deps */
 import { $embed } from '@src/signals';
 import { $upsellTimer } from '@src/components/embed/_helpers/checkout.consts';
 import { useEffect } from 'react';
@@ -6,7 +8,6 @@ import EmbedUpsellingCard from './EmbedUpsellingCard';
 
 function EmbedUpsellingsList({ disabled = false }) {
   useEffect(() => {
-    console.log('EmbedUpsellingsList', $embed.value.upsellings);
     $upsellTimer.value = 15;
   }, [$embed.value.currentStep]);
 

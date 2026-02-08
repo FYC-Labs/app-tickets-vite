@@ -244,6 +244,83 @@ const getPerUnitCustomFields = (current, upsellingId, newLength) => {
   return result;
 };
 
+// Debounce ref for updating order with upsellings
+let updateUpsellingsDebounceTimer = null;
+
+const updateOrderWithUpsellings = async () => {
+  const {
+    order: currentOrder,
+    selectedUpsellings: currentSelectedUpsellings,
+    upsellingCustomFields: currentUpsellingCustomFields,
+    upsellings: currentUpsellings,
+  } = $embed.value;
+
+  if (!currentOrder || currentOrder.status === 'PAID') {
+    return;
+  }
+
+  try {
+    const upsellingEntries = Object.entries(currentSelectedUpsellings || {});
+
+    const upsellingOrderItems = upsellingEntries
+      .filter(([, quantity]) => quantity > 0)
+      .flatMap(([upsellingId, quantity]) => {
+        const upselling = currentUpsellings.find((u) => u.id === upsellingId);
+        if (!upselling) {
+          return [];
+        }
+
+        const unitPrice = parseFloat(upselling.amount ?? upselling.price);
+        const rawCustom = (currentUpsellingCustomFields && currentUpsellingCustomFields[upsellingId]) || {};
+        const hasCustomFields = upselling.custom_fields && upselling.custom_fields.length > 0;
+
+        if (!hasCustomFields) {
+          return [
+            {
+              upselling_id: upsellingId,
+              quantity,
+              unit_price: unitPrice,
+              custom_fields: {},
+            },
+          ];
+        }
+
+        // For upsellings with custom fields, we need all fields complete for each unit
+        const perUnitList = Array.isArray(rawCustom) ? rawCustom : (rawCustom && typeof rawCustom === 'object' ? [rawCustom] : []);
+        const items = [];
+        for (let i = 0; i < quantity; i++) {
+          const customFieldValues = perUnitList[i] && typeof perUnitList[i] === 'object' ? perUnitList[i] : {};
+          // Check if all required custom fields are filled for this unit
+          const allFieldsComplete = upselling.custom_fields.every(field => {
+            const value = customFieldValues[field.label];
+            return value !== undefined && value !== null && value !== '';
+          });
+          // If custom fields are complete, add this unit to the order
+          if (allFieldsComplete) {
+            items.push({
+              upselling_id: upsellingId,
+              quantity: 1,
+              unit_price: unitPrice,
+              custom_fields: customFieldValues,
+            });
+          }
+        }
+        return items;
+      });
+
+    const upsellingDiscountAmount = getUpsellingDiscountAmount();
+    const updatedOrder = await ordersAPI.updatePendingItems(
+      currentOrder.id,
+      upsellingOrderItems,
+      upsellingDiscountAmount,
+    );
+    $embed.update({ order: updatedOrder });
+  } catch (err) {
+    console.error('Error updating order with upsellings:', err);
+    // Don't show error to user, just log it
+  }
+};
+
 export const handleUpsellingChange = (upsellingId, quantity) => {
   const selectedUpsellings = { ...$embed.value.selectedUpsellings };
   const newQuantity = parseInt(quantity, 10) || 0;
@@ -259,6 +336,15 @@ export const handleUpsellingChange = (upsellingId, quantity) => {
   $embed.update({ selectedUpsellings, upsellingCustomFields });
   calculateTotals();
   checkFormValidity();
+
+  // Debounce the database update to avoid too many API calls
+  if (updateUpsellingsDebounceTimer) {
+    clearTimeout(updateUpsellingsDebounceTimer);
+  }
+  updateUpsellingsDebounceTimer = setTimeout(() => {
+    updateOrderWithUpsellings();
+    updateUpsellingsDebounceTimer = null;
+  }, 500);
 };
 
 /** unitIndex: 0-based index of the selected unit (e.g. shirt 1, shirt 2) */
@@ -270,6 +356,15 @@ export const handleUpsellingCustomFieldChange = (upsellingId, unitIndex, fieldLa
   list[unitIndex] = { ...list[unitIndex], [fieldLabel]: value };
   upsellingCustomFields[upsellingId] = list;
   $embed.update({ upsellingCustomFields });
+
+  // Debounce the database update to avoid too many API calls
+  if (updateUpsellingsDebounceTimer) {
+    clearTimeout(updateUpsellingsDebounceTimer);
+  }
+  updateUpsellingsDebounceTimer = setTimeout(() => {
+    updateOrderWithUpsellings();
+    updateUpsellingsDebounceTimer = null;
+  }, 500);
 };
 
 export const validateForm = () => {
@@ -457,6 +552,9 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
     }
     $embed.update({ isLoadingCCForm: true });
 
+    const { form, formData } = $embed.value;
+    const hasMinimalData = formData?.email && formData?.name;
+
     // If an order exists and is PENDING, try to update it; otherwise create new
     let orderToUse = null;
 
@@ -480,12 +578,30 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
           return;
         }
 
+        // Create form_submission if it doesn't exist and we have minimal data
+        // Only include name and email in responses at this point
+        let submissionId = $embed.value.order.form_submission_id;
+        if (!submissionId && form && hasMinimalData) {
+          try {
+            const minimalResponses = {
+              name: formData.name,
+              email: formData.email,
+            };
+            const submission = await formsAPI.submitForm(form.id, minimalResponses, formData.email);
+            submissionId = submission.id;
+          } catch (submissionError) {
+            console.error('Error creating form submission:', submissionError);
+            // Continue without submission if creation fails
+          }
+        }
+
         orderToUse = await ordersAPI.update(
           $embed.value.order.id,
           orderItems,
           totals.discount_amount,
           $embed.value.formData.name,
           $embed.value.formData.email,
+          submissionId, // Pass submissionId if we created one
         );
       } catch (updateError) {
         // If update fails, create a new order
@@ -495,7 +611,9 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
 
     // Create new order if we don't have a valid updated one
     if (!orderToUse) {
-      orderToUse = await createOrderForPayment(null, $embed.value.form?.event_id, true); // Skip form submission
+      // Only skip form submission if we don't have minimal data
+      const skipFormSubmission = !hasMinimalData;
+      orderToUse = await createOrderForPayment(null, $embed.value.form?.event_id, skipFormSubmission);
     }
 
     if (orderToUse && orderToUse.id) {
@@ -540,15 +658,13 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
 
     let submissionId = null;
     if (form && !skipFormSubmission) {
-      const {
-        card_number: _cardNumber,
-        card_cvc: _cardCvc,
-        card_expiration: _cardExpiration,
-        cardholder_name: _cardholderName,
-        ...safeFormData
-      } = formData;
+      // Only include name and email in responses at this point
+      const minimalResponses = {
+        name: formData.name,
+        email: formData.email,
+      };
 
-      const submission = await formsAPI.submitForm(form.id, safeFormData, formData.email);
+      const submission = await formsAPI.submitForm(form.id, minimalResponses, formData.email);
       submissionId = submission.id;
     }
 
@@ -829,7 +945,6 @@ export const updateIsPayNowDisabled = () => {
   const hasEmail = $embed.value.formData.email && $embed.value.formData.email.trim() !== '';
   const hasTickets = Object.values($embed.value.selectedTickets).some((qty) => qty > 0);
   const isCcLoading = $embed.value.isLoadingCCForm;
-  console.log('updateIsPayNowDisabled', { hasName, hasEmail, hasTickets, isCcLoading });
   $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets || isCcLoading });
 };
 

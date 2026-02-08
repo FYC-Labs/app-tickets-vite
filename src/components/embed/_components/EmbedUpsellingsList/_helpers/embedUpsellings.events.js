@@ -1,8 +1,8 @@
-import * as consts from './embedUpsellings.consts';
 import {
   handleUpsellingChange as handlePreCheckoutUpsellingChange,
   handleUpsellingCustomFieldChange as handlePreCheckoutUpsellingCustomFieldChange,
 } from '@src/components/embed/_helpers/eventForm.events';
+import * as consts from './embedUpsellings.consts';
 
 export const setHoverPreview = (preview) => {
   consts.$hoverPreview.value = preview;

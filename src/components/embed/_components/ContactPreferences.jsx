@@ -1,4 +1,4 @@
-import { Card, Row, Col, Form } from 'react-bootstrap';
+import { Row, Col, Form } from 'react-bootstrap';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { formatPhone } from '@src/components/global/Inputs/UniversalInput/_helpers/universalinput.events';
@@ -40,8 +40,8 @@ function ContactPreferences({ form: formProp, formData: formDataProp, readOnly =
   const preferenceColMd = showPhoneCol ? 6 : 12;
 
   return (
-    <Card className="mt-32 border-0">
-      <Card.Body className="p-24">
+    <>
+      <Form.Group className="mb-24">
         <h6 className="mb-16 fw-semibold">Contact preferences</h6>
         <Row>
           {showPreferenceCol && (
@@ -99,8 +99,8 @@ function ContactPreferences({ form: formProp, formData: formDataProp, readOnly =
             </Col>
           )}
         </Row>
-      </Card.Body>
-    </Card>
+      </Form.Group>
+    </>
   );
 }
 

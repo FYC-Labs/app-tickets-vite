@@ -1,5 +1,5 @@
-import { Card } from 'react-bootstrap';
 import { $embed } from '@src/signals';
+import { Form } from 'react-bootstrap';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import { handleFieldChange } from '../_helpers/eventForm.events';
 
@@ -75,12 +75,12 @@ function AdditionalInformation({ form: formProp, formData: formDataProp, readOnl
   };
 
   return (
-    <Card className="mt-32 border-0">
-      <Card.Body className="p-24">
+    <>
+      <Form.Group className="mb-24">
         <h6 className="mb-16 fw-semibold">Additional information</h6>
         {form.schema.map((field, index) => renderFormSchemaField(field, index))}
-      </Card.Body>
-    </Card>
+      </Form.Group>
+    </>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Card, Alert, Container, Button } from 'react-bootstrap';
+import { Card, Alert, Container, Button, Form } from 'react-bootstrap';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { Signal } from '@fyclabs/tools-fyc-react/signals';
 import ordersAPI from '@src/api/orders.api';
@@ -183,14 +183,16 @@ function OrderConfirmation() {
         if (!isFormComplete) {
           return (
             <>
-              <ContactPreferences
-                form={form}
-                formData={responses}
-              />
-              <AdditionalInformation
-                form={form}
-                formData={responses}
-              />
+              <Form className="bg-light-200 rounded-15 p-16 mb-16">
+                <ContactPreferences
+                  form={form}
+                  formData={responses}
+                />
+                <AdditionalInformation
+                  form={form}
+                  formData={responses}
+                />
+              </Form>
               <div className="mb-24">
                 <Button variant="dark" onClick={handleSubmitForm}>
                   Submit Form

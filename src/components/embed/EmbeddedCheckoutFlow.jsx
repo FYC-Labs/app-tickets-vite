@@ -8,7 +8,7 @@ import Loader from '@src/components/global/Loader';
 import { handleClickPayNow } from '@src/components/embed/_helpers/eventForm.events';
 import EmbedUpsellingsList from '@src/components/embed/_components/EmbedUpsellingsList';
 import EmbedOrderTotals from '@src/components/embed/_components/EmbedOrderTotals';
-import { $upsellTimer } from '@src/components/embed/_helpers/checkout.consts';
+import { $upsellTimer, isProcessingPayment } from '@src/components/embed/_helpers/checkout.consts';
 import { handlePaymentSuccess, goToOrderConfirmation, loadFormData, updateIsPayNowDisabled } from './_helpers/eventForm.events';
 import Step1Checkout from './_components/Step1Checkout';
 import EmbedPaymentDetails from './_components/EmbedPaymentDetails';
@@ -46,37 +46,46 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
     <Card className={`${theme} border-0`}>
       <Card.Body>
         <div className={`d-${$embed.value.currentStep === 'initial' ? 'block' : 'none'}`}>
-          <Step1Checkout
-            formId={formId}
-            eventId={eventId}
-            theme={theme}
-            onPlaceOrder={() => { }}
-          />
+          {!isProcessingPayment.value && (
+            <Step1Checkout
+              formId={formId}
+              eventId={eventId}
+              theme={theme}
+              onPlaceOrder={() => { }}
+            />
+          )}
           {$embed.value.order && (
             <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
           )}
         </div>
         <div className={`d-${$embed.value.currentStep === 'upsell' ? 'block' : 'none'}`}>
-          <EmbedUpsellingsList />
+          {!isProcessingPayment.value && <EmbedUpsellingsList />}
+          {isProcessingPayment.value && $embed.value.order && (
+            <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+          )}
         </div>
-        <DiscountCodeInput
-          formId={formId}
-          eventId={eventId}
-          className="mt-24"
-        />
-        <Button
-          variant="dark"
-          size="lg"
-          className="w-100 mt-24"
-          onClick={handleClickPayNow}
-          disabled={$embed.value.isPayNowDisabled}
-        >
-          {$embed.value.currentStep === 'initial' ? 'Place Order' : 'Complete Checkout'}
-        </Button>
-        {$embed.value.currentStep === 'upsell' && (
-          <div className="text-muted text-center mt-8">Auto-completes in {$upsellTimer.value} seconds</div>
+        {!isProcessingPayment.value && (
+          <>
+            <DiscountCodeInput
+              formId={formId}
+              eventId={eventId}
+              className="mt-24"
+            />
+            <Button
+              variant="dark"
+              size="lg"
+              className="w-100 mt-24"
+              onClick={handleClickPayNow}
+              disabled={$embed.value.isPayNowDisabled}
+            >
+              {$embed.value.currentStep === 'initial' ? 'Place Order' : 'Complete Checkout'}
+            </Button>
+            {$embed.value.currentStep === 'upsell' && (
+              <div className="text-muted text-center mt-8">Auto-completes in {$upsellTimer.value} seconds</div>
+            )}
+            <EmbedOrderTotals />
+          </>
         )}
-        <EmbedOrderTotals />
       </Card.Body>
     </Card>
   );

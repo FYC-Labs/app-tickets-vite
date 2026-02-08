@@ -204,8 +204,8 @@ function OrderConfirmation() {
         return null;
       })()}
 
-      <Card className="mb-24">
-        <Card.Body>
+      <Card className="bg-light-200 rounded-15 border-0 mb-24">
+        <Card.Body className="p-16">
           <h5 className="mb-24">Order Details</h5>
 
           <div className="mb-16">

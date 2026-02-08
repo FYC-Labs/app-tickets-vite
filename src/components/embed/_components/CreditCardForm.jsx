@@ -17,10 +17,20 @@ const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, 
   );
 
   const handleSuccess = async (paymentData) => {
-    if (onPaymentSuccess) {
-      await onPaymentSuccess(paymentData);
-    } else {
-      await events.handlePaymentSuccess(paymentData);
+    // Keep isProcessingPayment true until redirect completes
+    // This prevents showing components briefly before redirect
+    try {
+      if (onPaymentSuccess) {
+        await onPaymentSuccess(paymentData);
+      } else {
+        await events.handlePaymentSuccess(paymentData);
+      }
+      // Don't set isProcessingPayment to false here - let the redirect happen first
+      // It will be reset when the page unloads or if there's an error
+    } catch (error) {
+      // Only set to false on error
+      isProcessingPayment.value = false;
+      throw error;
     }
   };
 
@@ -124,9 +134,14 @@ const CreditCardForm = memo(({ order, onPaymentSuccess, submitDisabled = false, 
                 isProcessingPayment.value = true;
               }}
               onSuccess={handleSuccess}
-              onError={events.handlePaymentError}
-              onComplete={() => {
+              onError={(error) => {
                 isProcessingPayment.value = false;
+                events.handlePaymentError(error);
+              }}
+              onComplete={() => {
+                // Only set to false if payment wasn't successful (error case)
+                // For successful payments, keep it true until redirect completes
+                // This prevents showing components briefly before redirect
               }}
               disabled={isProcessingPayment.value || submitDisabled}
             />

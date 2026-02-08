@@ -963,13 +963,11 @@ export const handleClickPayNow = () => {
       return;
     }
     submitPaymentFormProgrammatically();
-    $embed.update({ currentStep: 'initial' });
     return;
   }
 
   if ($embed.value.currentStep === 'upsell') {
     submitPaymentFormProgrammatically();
-    $embed.update({ currentStep: 'initial' });
     return;
   }
 

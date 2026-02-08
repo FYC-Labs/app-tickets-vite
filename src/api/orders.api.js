@@ -47,8 +47,8 @@ export const ordersAPI = {
     return result.data;
   },
 
-  async update(orderId, items, upsellingDiscountAmount = 0, customerName = null, customerEmail = null) {
-    const result = await edgeFunctionHelpers.orders.update(orderId, items, upsellingDiscountAmount, customerName, customerEmail);
+  async update(orderId, items, upsellingDiscountAmount = 0, customerName = null, customerEmail = null, discountCodeId = null) {
+    const result = await edgeFunctionHelpers.orders.update(orderId, items, upsellingDiscountAmount, customerName, customerEmail, discountCodeId);
     return result.data;
   },
 

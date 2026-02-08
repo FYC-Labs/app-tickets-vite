@@ -293,9 +293,9 @@ export const edgeFunctionHelpers = {
       method: 'POST',
       body: { action: 'updatePendingItems', id, items, upsellingDiscountAmount },
     }),
-    update: (id, items, upsellingDiscountAmount = 0, customerName = null, customerEmail = null) => callEdgeFunction('orders', {
+    update: (id, items, upsellingDiscountAmount = 0, customerName = null, customerEmail = null, discountCodeId = null) => callEdgeFunction('orders', {
       method: 'POST',
-      body: { action: 'update', id, items, upsellingDiscountAmount, customerName, customerEmail },
+      body: { action: 'update', id, items, upsellingDiscountAmount, customerName, customerEmail, discountCodeId },
     }),
     delete: (id) => callEdgeFunction('orders', {
       method: 'POST',

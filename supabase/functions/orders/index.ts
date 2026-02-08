@@ -727,7 +727,10 @@ Deno.serve(async (req: Request) => {
           if (itemsError) throw itemsError;
 
           // Calculate discount from discount code (applies only to ticket items, not upsellings)
-          if (order.discount_code_id) {
+          // Use provided discountCodeId if available, otherwise use existing order discount_code_id
+          const discountCodeIdToUse = discountCodeId !== undefined ? discountCodeId : order.discount_code_id;
+          
+          if (discountCodeIdToUse) {
             // Calculate subtotal of ticket items only (base items)
             const ticketSubtotal = items
               .filter((item: any) => !item.upselling_id)
@@ -737,7 +740,7 @@ Deno.serve(async (req: Request) => {
               const { data: discountCode } = await supabaseClient
                 .from("discount_codes")
                 .select("type, value")
-                .eq("id", order.discount_code_id)
+                .eq("id", discountCodeIdToUse)
                 .maybeSingle();
 
               if (discountCode) {
@@ -752,7 +755,7 @@ Deno.serve(async (req: Request) => {
           }
 
           // Apply upselling discount if provided and no discount code exists
-          if (!order.discount_code_id && upsellingDiscountAmount) {
+          if (!discountCodeIdToUse && upsellingDiscountAmount) {
             newDiscountAmount = parseFloat(upsellingDiscountAmount) || 0;
           }
         }
@@ -766,6 +769,11 @@ Deno.serve(async (req: Request) => {
           total: newTotal.toFixed(2),
           updated_at: new Date().toISOString(),
         };
+
+        // Update discount_code_id if provided
+        if (discountCodeId !== undefined) {
+          updateData.discount_code_id = discountCodeId;
+        }
 
         if (customerName !== undefined) {
           updateData.customer_name = customerName;

@@ -7,23 +7,38 @@ import { handleClickPayNow } from '@src/components/embed/_helpers/eventForm.even
 import EmbedUpsellingCard from './EmbedUpsellingCard';
 
 function EmbedUpsellingsList({ disabled = false }) {
+  // Reset timer when entering upsell step
   useEffect(() => {
-    $upsellTimer.value = 15;
+    if ($embed.value.currentStep === 'upsell') {
+      $upsellTimer.value = 15;
+    }
   }, [$embed.value.currentStep]);
 
   useEffect(() => {
-    if ($embed.value.currentStep !== 'upsell') return;
+    if ($embed.value.currentStep !== 'upsell') {
+      return;
+    }
+
+    if ($embed.value.isPayNowDisabled) {
+      return;
+    }
+
     const timer = setInterval(() => {
+      if ($embed.value.currentStep !== 'upsell' || $embed.value.isPayNowDisabled) {
+        clearInterval(timer);
+        return;
+      }
+
       if ($upsellTimer.value > 0) {
         $upsellTimer.value--;
       } else {
-        if ($embed.value.currentStep !== 'upsell') return;
-        handleClickPayNow();
         clearInterval(timer);
+        handleClickPayNow();
       }
     }, 1000);
+
     return () => clearInterval(timer);
-  }, []);
+  }, [$embed.value.currentStep, $embed.value.isPayNowDisabled]);
   return (
     <div style={{ minHeight: '300px' }}>
       <div className="mb-16">

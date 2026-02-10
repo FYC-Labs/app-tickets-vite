@@ -207,7 +207,7 @@ export const handleTicketChange = async (ticketId, quantity) => {
 };
 
 export const handleApplyDiscount = async (formId, eventId) => {
-  const { discountCode, order } = $embed.value;
+  const { discountCode } = $embed.value;
 
   if (!discountCode) return;
 
@@ -221,80 +221,11 @@ export const handleApplyDiscount = async (formId, eventId) => {
         error: null,
       });
       calculateTotals();
-
-      // Update order in database if order exists
-      if (order && order.status === 'PENDING') {
-        try {
-          const { totals, selectedTickets, tickets } = $embed.value;
-
-          // Build order items from selected tickets
-          const orderItems = Object.entries(selectedTickets)
-            .filter(([, quantity]) => quantity > 0)
-            .map(([ticketId, quantity]) => {
-              const ticket = tickets.find((t) => t.id === ticketId);
-              return {
-                ticket_type_id: ticketId,
-                quantity,
-                unit_price: parseFloat(ticket.price),
-              };
-            });
-
-          // Only update if there are order items
-          if (orderItems.length > 0) {
-            const discountCodeId = result.discount?.id || null;
-            const updatedOrder = await ordersAPI.update(
-              order.id,
-              orderItems,
-              totals.discount_amount,
-              $embed.value.formData.name,
-              $embed.value.formData.email,
-              discountCodeId,
-            );
-            $embed.update({ order: updatedOrder });
-          }
-        } catch (updateError) {
-          console.error('Error updating order with discount:', updateError);
-          // Don't show error to user, discount is still applied locally
-        }
-      }
     } else {
       $embed.update({
         error: result.error,
         appliedDiscount: null,
       });
-
-      // Remove discount from order if order exists
-      if (order && order.status === 'PENDING') {
-        try {
-          const { totals, selectedTickets, tickets } = $embed.value;
-
-          const orderItems = Object.entries(selectedTickets)
-            .filter(([, quantity]) => quantity > 0)
-            .map(([ticketId, quantity]) => {
-              const ticket = tickets.find((t) => t.id === ticketId);
-              return {
-                ticket_type_id: ticketId,
-                quantity,
-                unit_price: parseFloat(ticket.price),
-              };
-            });
-
-          if (orderItems.length > 0) {
-            // Update order with null discount_code_id to remove discount
-            const updatedOrder = await ordersAPI.update(
-              order.id,
-              orderItems,
-              totals.discount_amount,
-              $embed.value.formData.name,
-              $embed.value.formData.email,
-              null, // Remove discount code
-            );
-            $embed.update({ order: updatedOrder });
-          }
-        } catch (updateError) {
-          console.error('Error removing discount from order:', updateError);
-        }
-      }
     }
   } catch (err) {
     $embed.update({ error: 'Error validating discount code' });
@@ -664,16 +595,13 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
           }
         }
 
-        // Get discount code ID from applied discount if available
-        const discountCodeId = $embed.value.appliedDiscount?.id || null;
-
         orderToUse = await ordersAPI.update(
           $embed.value.order.id,
           orderItems,
           totals.discount_amount,
           $embed.value.formData.name,
           $embed.value.formData.email,
-          discountCodeId,
+          submissionId, // Pass submissionId if we created one
         );
       } catch (updateError) {
         // If update fails, create a new order

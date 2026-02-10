@@ -66,11 +66,13 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
         </div>
         {!isProcessingPayment.value && (
           <>
+            {$embed.value.currentStep === 'initial' && (
             <DiscountCodeInput
               formId={formId}
               eventId={eventId}
               className="mt-24"
             />
+            )}
             <Button
               variant="dark"
               size="lg"

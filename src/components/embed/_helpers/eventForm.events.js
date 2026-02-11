@@ -966,6 +966,10 @@ export const updateIsPayNowDisabled = () => {
 };
 
 export const submitPaymentFormProgrammatically = () => {
+  if ($embed.value.totals.total <= 0) {
+    handleFreeOrderComplete();
+    return;
+  }
   if (paymentSubmitBtnRef.value) {
     paymentSubmitBtnRef.value.click();
   } else {

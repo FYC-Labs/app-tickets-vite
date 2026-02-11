@@ -177,6 +177,7 @@ export const calculateTotals = () => {
 
   $embed.update({
     totals: {
+      ticketsSubtotal,
       subtotal: parseFloat(totalSubtotal.toFixed(2)),
       discount_amount: parseFloat(totalDiscountAmount.toFixed(2)),
       total: parseFloat(total.toFixed(2)),
@@ -321,7 +322,7 @@ const updateOrderWithUpsellings = async () => {
   }
 };
 
-export const handleUpsellingChange = (upsellingId, quantity) => {
+export const handleUpsellingChange = async (upsellingId, quantity) => {
   const selectedUpsellings = { ...$embed.value.selectedUpsellings };
   const newQuantity = parseInt(quantity, 10) || 0;
   selectedUpsellings[upsellingId] = newQuantity;
@@ -345,6 +346,17 @@ export const handleUpsellingChange = (upsellingId, quantity) => {
     updateOrderWithUpsellings();
     updateUpsellingsDebounceTimer = null;
   }, 500);
+
+  calculateTotals();
+  checkFormValidity();
+  updateIsPayNowDisabled();
+  disableCountDownTimer();
+
+  await createOrUpdateOrderAndInitializePayment();
+};
+
+export const disableCountDownTimer = () => {
+  $embed.update({ isCountDownTimerDisabled: true });
 };
 
 /** unitIndex: 0-based index of the selected unit (e.g. shirt 1, shirt 2) */
@@ -690,8 +702,13 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
   }
 };
 
-export const updateDiscountCode = (code) => {
+export const updateDiscountCode = async (code) => {
   $embed.update({ discountCode: code });
+  calculateTotals();
+  checkFormValidity();
+  updateIsPayNowDisabled();
+
+  await createOrUpdateOrderAndInitializePayment();
 };
 
 const buildConfirmationUrl = (baseUrl, order) => {
@@ -966,7 +983,17 @@ export const handleClickPayNow = () => {
     return;
   }
 
+  if ($embed.value.currentStep === 'upsell' && $embed.value.totals.ticketsSubtotal <= $embed.value.totals.discount_amount) {
+    $embed.update({ currentStep: 'checkoutWithUpsell' });
+    return;
+  }
+
   if ($embed.value.currentStep === 'upsell') {
+    submitPaymentFormProgrammatically();
+    return;
+  }
+
+  if ($embed.value.currentStep === 'checkoutWithUpsell') {
     submitPaymentFormProgrammatically();
     return;
   }

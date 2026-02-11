@@ -33,7 +33,9 @@ function EmbedUpsellingsList({ disabled = false }) {
         $upsellTimer.value--;
       } else {
         clearInterval(timer);
-        handleClickPayNow();
+        if (!$embed.value.isCountDownTimerDisabled) {
+          handleClickPayNow();
+        }
       }
     }, 1000);
 

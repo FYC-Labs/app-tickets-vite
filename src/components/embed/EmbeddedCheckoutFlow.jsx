@@ -54,24 +54,32 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
               onPlaceOrder={() => { }}
             />
           )}
+        </div>
+        <div className={`d-${$embed.value.currentStep === 'checkoutWithUpsell' ? 'block' : 'none'}`}>
           {$embed.value.order && (
-            <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+            <>
+              {$embed.value.totals?.total === 0 && (
+                <div className="my-16 lead text-center text-dark bg-light-200 rounded-15 p-16">
+                  Your order is $0. Click below to complete your free registration!
+                </div>
+              )}
+              <div className={`d-${$embed.value.totals?.total === 0 ? 'none' : 'block'}`}>
+                <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+              </div>
+            </>
           )}
         </div>
         <div className={`d-${$embed.value.currentStep === 'upsell' ? 'block' : 'none'}`}>
           {!isProcessingPayment.value && <EmbedUpsellingsList />}
-          {isProcessingPayment.value && $embed.value.order && (
-            <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
-          )}
         </div>
         {!isProcessingPayment.value && (
           <>
             {$embed.value.currentStep === 'initial' && (
-            <DiscountCodeInput
-              formId={formId}
-              eventId={eventId}
-              className="mt-24"
-            />
+              <DiscountCodeInput
+                formId={formId}
+                eventId={eventId}
+                className="mt-24"
+              />
             )}
             <Button
               variant="dark"
@@ -82,7 +90,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
             >
               {$embed.value.currentStep === 'initial' ? 'Place Order' : 'Complete Checkout'}
             </Button>
-            {$embed.value.currentStep === 'upsell' && (
+            {$embed.value.currentStep === 'upsell' && !$embed.value.isCountDownTimerDisabled && (
               <div className="text-muted text-center mt-8">Auto-completes in {$upsellTimer.value} seconds</div>
             )}
             <EmbedOrderTotals />

@@ -340,11 +340,11 @@ const updateOrderWithUpsellings = async () => {
         return items;
       });
 
-    const upsellingDiscountAmount = getUpsellingDiscountAmount();
+    const totalDiscountAmount = $embed.value.totals?.discount_amount ?? getUpsellingDiscountAmount();
     const updatedOrder = await ordersAPI.updatePendingItems(
       currentOrder.id,
       upsellingOrderItems,
-      upsellingDiscountAmount,
+      totalDiscountAmount,
     );
     $embed.update({ order: updatedOrder });
   } catch (err) {
@@ -999,7 +999,7 @@ export const submitPaymentFormProgrammatically = () => {
   }
 };
 
-export const handleClickPayNow = () => {
+export const handleClickPayNow = async () => {
   if ($embed.value.currentStep === 'initial') {
     if ($embed.value.upsellings.length > 0) {
       $embed.update({ currentStep: 'upsell' });
@@ -1010,7 +1010,36 @@ export const handleClickPayNow = () => {
   }
 
   if ($embed.value.currentStep === 'upsell' && $embed.value.totals.ticketsSubtotal <= $embed.value.totals.discount_amount) {
+    const hasSelectedUpsellings = Object.values($embed.value.selectedUpsellings).some((qty) => qty > 0);
+
+    // Only flush upselling updates if the user actually selected upsellings
+    if (hasSelectedUpsellings) {
+      if (updateUpsellingsDebounceTimer) {
+        clearTimeout(updateUpsellingsDebounceTimer);
+        updateUpsellingsDebounceTimer = null;
+      }
+      await updateOrderWithUpsellings();
+    }
+
     $embed.update({ currentStep: 'checkoutWithUpsell' });
+
+    // Only initialize payment session if there is something to pay
+    if ($embed.value.totals.total > 0) {
+      $embed.update({ isLoadingCCForm: true });
+      try {
+        const { order } = $embed.value;
+        if (order?.id) {
+          const sessionData = await initializePaymentSession(order.id);
+          if (sessionData) {
+            $embed.update({ paymentSession: sessionData });
+          }
+        }
+      } catch (err) {
+        // Payment session initialization failed - form will show error state
+      } finally {
+        $embed.update({ isLoadingCCForm: false });
+      }
+    }
     return;
   }
 

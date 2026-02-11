@@ -60,7 +60,8 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
               onPlaceOrder={() => { }}
             />
           )}
-          {$embed.value.order &&
+          {$embed.value.currentStep !== 'checkoutWithUpsell' &&
+           $embed.value.order &&
            parseFloat($embed.value.totals?.subtotal) > $embed.value.totals?.discount_amount && (
            <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
           )}

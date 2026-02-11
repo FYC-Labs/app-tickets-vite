@@ -222,6 +222,37 @@ export const handleApplyDiscount = async (formId, eventId) => {
         error: null,
       });
       calculateTotals();
+      updateIsPayNowDisabled();
+
+      // Update existing order with new discount amounts without re-initializing payment session
+      const { order, totals, selectedTickets, tickets, formData } = $embed.value;
+      if (order && order.status === 'PENDING') {
+        const orderItems = Object.entries(selectedTickets)
+          .filter(([, quantity]) => quantity > 0)
+          .map(([ticketId, quantity]) => {
+            const ticket = tickets.find((t) => t.id === ticketId);
+            return {
+              ticket_type_id: ticketId,
+              quantity,
+              unit_price: parseFloat(ticket.price),
+            };
+          });
+
+        if (orderItems.length > 0) {
+          try {
+            const updatedOrder = await ordersAPI.update(
+              order.id,
+              orderItems,
+              totals.discount_amount,
+              formData.name,
+              formData.email,
+            );
+            $embed.update({ order: updatedOrder });
+          } catch (updateErr) {
+            // Non-critical: order update for discount failed silently
+          }
+        }
+      }
     } else {
       $embed.update({
         error: result.error,
@@ -322,7 +353,7 @@ const updateOrderWithUpsellings = async () => {
   }
 };
 
-export const handleUpsellingChange = async (upsellingId, quantity) => {
+export const handleUpsellingChange = (upsellingId, quantity) => {
   const selectedUpsellings = { ...$embed.value.selectedUpsellings };
   const newQuantity = parseInt(quantity, 10) || 0;
   selectedUpsellings[upsellingId] = newQuantity;
@@ -337,8 +368,11 @@ export const handleUpsellingChange = async (upsellingId, quantity) => {
   $embed.update({ selectedUpsellings, upsellingCustomFields });
   calculateTotals();
   checkFormValidity();
+  updateIsPayNowDisabled();
+  disableCountDownTimer();
 
   // Debounce the database update to avoid too many API calls
+  // updateOrderWithUpsellings updates the order items without re-initializing the payment session
   if (updateUpsellingsDebounceTimer) {
     clearTimeout(updateUpsellingsDebounceTimer);
   }
@@ -346,13 +380,6 @@ export const handleUpsellingChange = async (upsellingId, quantity) => {
     updateOrderWithUpsellings();
     updateUpsellingsDebounceTimer = null;
   }, 500);
-
-  calculateTotals();
-  checkFormValidity();
-  updateIsPayNowDisabled();
-  disableCountDownTimer();
-
-  await createOrUpdateOrderAndInitializePayment();
 };
 
 export const disableCountDownTimer = () => {
@@ -702,13 +729,8 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
   }
 };
 
-export const updateDiscountCode = async (code) => {
+export const updateDiscountCode = (code) => {
   $embed.update({ discountCode: code });
-  calculateTotals();
-  checkFormValidity();
-  updateIsPayNowDisabled();
-
-  await createOrUpdateOrderAndInitializePayment();
 };
 
 const buildConfirmationUrl = (baseUrl, order) => {

@@ -5,6 +5,7 @@ import { Card, Button } from 'react-bootstrap';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import { $embed } from '@src/signals';
 import Loader from '@src/components/global/Loader';
+import CardLoader from '@src/components/global/CardLoader';
 import { handleClickPayNow } from '@src/components/embed/_helpers/eventForm.events';
 import EmbedUpsellingsList from '@src/components/embed/_components/EmbedUpsellingsList';
 import EmbedOrderTotals from '@src/components/embed/_components/EmbedOrderTotals';
@@ -45,6 +46,11 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   return (
     <Card className={`${theme} border-0`}>
       <Card.Body>
+        {isProcessingPayment.value && (
+          <div className="bg-light-200 rounded-15 p-16">
+            <CardLoader variant="skeleton" message="Processing payment..." />
+          </div>
+        )}
         <div className={`d-${$embed.value.currentStep === 'initial' ? 'block' : 'none'}`}>
           {!isProcessingPayment.value && (
             <Step1Checkout
@@ -53,6 +59,10 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
               theme={theme}
               onPlaceOrder={() => { }}
             />
+          )}
+          {$embed.value.order &&
+           parseFloat($embed.value.totals?.subtotal) > $embed.value.totals?.discount_amount && (
+           <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
           )}
         </div>
         <div className={`d-${$embed.value.currentStep === 'checkoutWithUpsell' ? 'block' : 'none'}`}>
@@ -74,7 +84,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
         </div>
         {!isProcessingPayment.value && (
           <>
-            {$embed.value.currentStep === 'initial' && (
+            {$embed.value.order && $embed.value.currentStep === 'initial' && (
               <DiscountCodeInput
                 formId={formId}
                 eventId={eventId}

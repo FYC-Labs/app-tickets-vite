@@ -44,6 +44,9 @@ Deno.serve(async (req: Request) => {
       paymentIntentId,
       items,
       discountCodeId,
+      upsellingDiscountAmount,
+      customerName,
+      customerEmail,
       data,
     } = await req.json();
 
@@ -141,10 +144,12 @@ Deno.serve(async (req: Request) => {
               id,
               order_id,
               ticket_type_id,
+              upselling_id,
               quantity,
               unit_price,
               subtotal,
-              ticket_types(name)
+              ticket_types(name),
+              upsellings(item)
             ),
             discount_codes(code, type, value)
           `,
@@ -163,7 +168,10 @@ Deno.serve(async (req: Request) => {
                 `
               id,
               form_id,
-              submission_data,
+              responses,
+              email,
+              order_id,
+              created_at,
               forms(*)
             `,
               )
@@ -233,12 +241,13 @@ Deno.serve(async (req: Request) => {
         if (items && items.length > 0) {
           const orderItems = items.map((item: any) => ({
             order_id: newOrder.id,
-            ticket_type_id: item.ticket_type_id,
+            ticket_type_id: item.ticket_type_id ?? null,
+            upselling_id: item.upselling_id || null,
             quantity: item.quantity,
             unit_price: item.unit_price,
             subtotal: item.quantity * item.unit_price,
+            custom_fields: item.custom_fields ?? {},
           }));
-
           const { error: itemsError } = await supabaseClient
             .from("order_items")
             .insert(orderItems);
@@ -438,6 +447,346 @@ Deno.serve(async (req: Request) => {
           discount_amount: parseFloat(discountAmount.toFixed(2)),
           total: parseFloat(total.toFixed(2)),
         };
+        break;
+      }
+
+      case "addItemsToOrder": {
+        // First check if order exists and is PAID
+        const { data: order, error: fetchError } = await supabaseClient
+          .from("orders")
+          .select("id, status, subtotal, discount_amount, total, event_id")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!order) {
+          throw new Error("Order not found");
+        }
+
+        if (order.status !== "PAID") {
+          throw new Error("Can only add items to paid orders");
+        }
+
+        if (!items || items.length === 0) {
+          throw new Error("No items provided");
+        }
+
+        // Calculate new items subtotal
+        let newItemsSubtotal = 0;
+        const orderItems = items.map((item: any) => {
+          const itemSubtotal = item.quantity * item.unit_price;
+          newItemsSubtotal += itemSubtotal;
+          return {
+            order_id: id,
+            ticket_type_id: item.ticket_type_id || null,
+            upselling_id: item.upselling_id || null,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: itemSubtotal,
+            custom_fields: item.custom_fields ?? {},
+          };
+        });
+
+        // Insert new order items
+        const { error: itemsError } = await supabaseClient
+          .from("order_items")
+          .insert(orderItems);
+
+        if (itemsError) throw itemsError;
+
+        // Update order totals
+        const newSubtotal = parseFloat(order.subtotal) + newItemsSubtotal;
+        // Apply existing discount to new total (if any)
+        const newTotal = Math.max(0, newSubtotal - parseFloat(order.discount_amount || 0));
+
+        const { data: updatedOrder, error: updateError } = await supabaseClient
+          .from("orders")
+          .update({
+            subtotal: newSubtotal.toFixed(2),
+            total: newTotal.toFixed(2),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select(
+            "*, events(title), order_items(*, ticket_types(name), upsellings(item)), discount_codes(code, type, value)",
+          )
+          .single();
+
+        if (updateError) throw updateError;
+
+        // Update inventory for upsellings if they have quantity tracking
+        for (const item of items) {
+          if (item.upselling_id) {
+            // Check if upselling has quantity tracking
+            const { data: upselling } = await supabaseClient
+              .from("upsellings")
+              .select("quantity, sold")
+              .eq("id", item.upselling_id)
+              .maybeSingle();
+
+            if (upselling && upselling.quantity !== null) {
+              await supabaseClient
+                .from("upsellings")
+                .update({
+                  sold: (upselling.sold || 0) + item.quantity,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", item.upselling_id);
+            }
+          }
+        }
+
+        result = { data: updatedOrder };
+        break;
+      }
+
+      case "updatePendingItems": {
+        // Update items (typically upsellings) on a PENDING order before payment
+        const { data: order, error: fetchError } = await supabaseClient
+          .from("orders")
+          .select("id, status, subtotal, discount_amount, discount_code_id")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!order) {
+          throw new Error("Order not found");
+        }
+
+        if (order.status === "PAID") {
+          throw new Error("Cannot update items on paid orders");
+        }
+
+        // Fetch current non-upselling items to preserve their subtotal
+        const { data: baseItems, error: baseItemsError } = await supabaseClient
+          .from("order_items")
+          .select("subtotal")
+          .eq("order_id", id)
+          .is("upselling_id", null);
+
+        if (baseItemsError) throw baseItemsError;
+
+        let baseSubtotal = 0;
+        if (baseItems && baseItems.length > 0) {
+          for (const item of baseItems) {
+            baseSubtotal += parseFloat(item.subtotal);
+          }
+        }
+
+        // Remove existing upselling items for this order (always, so we replace with new list or empty)
+        const { error: deleteUpsellingsError } = await supabaseClient
+          .from("order_items")
+          .delete()
+          .eq("order_id", id)
+          .not("upselling_id", "is", null);
+
+        if (deleteUpsellingsError) throw deleteUpsellingsError;
+
+        let newSubtotal: number;
+        let newDiscountAmount: number;
+
+        if (!items || items.length === 0) {
+          // Cliente eliminó todos los upsellings: solo tickets, descuento = solo código (sin descuento de upsellings)
+          newSubtotal = baseSubtotal;
+          newDiscountAmount = 0;
+          if (order.discount_code_id && baseSubtotal > 0) {
+            const { data: discountCode } = await supabaseClient
+              .from("discount_codes")
+              .select("type, value")
+              .eq("id", order.discount_code_id)
+              .maybeSingle();
+            if (discountCode) {
+              if (discountCode.type === "PERCENT") {
+                newDiscountAmount = (baseSubtotal * parseFloat(discountCode.value)) / 100;
+              } else {
+                const fixedDiscount = parseFloat(discountCode.value);
+                newDiscountAmount = Math.min(fixedDiscount, baseSubtotal);
+              }
+            }
+          }
+        } else {
+          // Insert new upselling items from payload
+          let newUpsellingsSubtotal = 0;
+          const orderItems = items.map((item: any) => {
+            const itemSubtotal = item.quantity * item.unit_price;
+            newUpsellingsSubtotal += itemSubtotal;
+            return {
+              order_id: id,
+              ticket_type_id: item.ticket_type_id || null,
+              upselling_id: item.upselling_id || null,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              subtotal: itemSubtotal,
+              custom_fields: item.custom_fields ?? {},
+            };
+          });
+
+          const { error: itemsError } = await supabaseClient
+            .from("order_items")
+            .insert(orderItems);
+
+          if (itemsError) throw itemsError;
+
+          newSubtotal = baseSubtotal + newUpsellingsSubtotal;
+          // Discount code applies only to tickets (baseSubtotal), not to upsellings
+          let discountFromCode = 0;
+          if (order.discount_code_id && baseSubtotal > 0) {
+            const { data: dc } = await supabaseClient
+              .from("discount_codes")
+              .select("type, value")
+              .eq("id", order.discount_code_id)
+              .maybeSingle();
+            if (dc) {
+              if (dc.type === "PERCENT") {
+                discountFromCode = (baseSubtotal * parseFloat(dc.value)) / 100;
+              } else {
+                const fixedDiscount = parseFloat(dc.value);
+                discountFromCode = Math.min(fixedDiscount, baseSubtotal);
+              }
+            }
+          }
+          // When a discount code is on the order, do not apply upselling discount rules
+          const additionalUpsellingDiscount = order.discount_code_id
+            ? 0
+            : parseFloat(upsellingDiscountAmount ?? 0) || 0;
+          newDiscountAmount = discountFromCode + additionalUpsellingDiscount;
+        }
+
+        const newTotal = Math.max(0, newSubtotal - newDiscountAmount);
+
+        const { data: updatedOrder, error: updateError } = await supabaseClient
+          .from("orders")
+          .update({
+            subtotal: newSubtotal.toFixed(2),
+            discount_amount: newDiscountAmount.toFixed(2),
+            total: newTotal.toFixed(2),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select(
+            "*, events(title), order_items(*, ticket_types(name), upsellings(item)), discount_codes(code, type, value)",
+          )
+          .single();
+
+        if (updateError) throw updateError;
+
+        // Important: Do not update the upselling inventory here; just mark the order as PAID
+
+        result = { data: updatedOrder };
+        break;
+      }
+
+      case "update": {
+        // Update ALL items (both base tickets and upsellings) and customer info on a PENDING order
+        const { data: order, error: fetchError } = await supabaseClient
+          .from("orders")
+          .select("id, status, discount_code_id")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!order) {
+          throw new Error("Order not found");
+        }
+
+        if (order.status === "PAID") {
+          throw new Error("Cannot update items on paid orders");
+        }
+
+        // Delete ALL existing order items (both base and upselling)
+        const { error: deleteItemsError } = await supabaseClient
+          .from("order_items")
+          .delete()
+          .eq("order_id", id);
+
+        if (deleteItemsError) throw deleteItemsError;
+
+        let newSubtotal = 0;
+        let newDiscountAmount = 0;
+
+        if (items && items.length > 0) {
+          // Insert new order items
+          const orderItems = items.map((item: any) => {
+            const itemSubtotal = item.quantity * item.unit_price;
+            newSubtotal += itemSubtotal;
+            return {
+              order_id: id,
+              ticket_type_id: item.ticket_type_id || null,
+              upselling_id: item.upselling_id || null,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              subtotal: itemSubtotal,
+              custom_fields: item.custom_fields ?? {},
+            };
+          });
+
+          const { error: itemsError } = await supabaseClient
+            .from("order_items")
+            .insert(orderItems);
+
+          if (itemsError) throw itemsError;
+
+          // Calculate discount from discount code (applies only to ticket items, not upsellings)
+          if (order.discount_code_id) {
+            // Calculate subtotal of ticket items only (base items)
+            const ticketSubtotal = items
+              .filter((item: any) => !item.upselling_id)
+              .reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0);
+
+            if (ticketSubtotal > 0) {
+              const { data: discountCode } = await supabaseClient
+                .from("discount_codes")
+                .select("type, value")
+                .eq("id", order.discount_code_id)
+                .maybeSingle();
+
+              if (discountCode) {
+                if (discountCode.type === "PERCENT") {
+                  newDiscountAmount = (ticketSubtotal * parseFloat(discountCode.value)) / 100;
+                } else {
+                  const fixedDiscount = parseFloat(discountCode.value);
+                  newDiscountAmount = Math.min(fixedDiscount, ticketSubtotal);
+                }
+              }
+            }
+          }
+
+          // Apply upselling discount if provided and no discount code exists
+          if (!order.discount_code_id && upsellingDiscountAmount) {
+            newDiscountAmount = parseFloat(upsellingDiscountAmount) || 0;
+          }
+        }
+
+        const newTotal = Math.max(0, newSubtotal - newDiscountAmount);
+
+        // Build update object with customer info if provided
+        const updateData: any = {
+          subtotal: newSubtotal.toFixed(2),
+          discount_amount: newDiscountAmount.toFixed(2),
+          total: newTotal.toFixed(2),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (customerName !== undefined) {
+          updateData.customer_name = customerName;
+        }
+
+        if (customerEmail !== undefined) {
+          updateData.customer_email = customerEmail;
+        }
+
+        const { data: updatedOrder, error: updateError } = await supabaseClient
+          .from("orders")
+          .update(updateData)
+          .eq("id", id)
+          .select(
+            "*, events(title), order_items(*, ticket_types(name), upsellings(item)), discount_codes(code, type, value)",
+          )
+          .single();
+
+        if (updateError) throw updateError;
+
+        result = { data: updatedOrder };
         break;
       }
 

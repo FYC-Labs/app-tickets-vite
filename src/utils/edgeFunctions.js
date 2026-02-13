@@ -72,13 +72,21 @@ export async function callEdgeFunction(functionName, options = {}) {
       if (response.status === 404) {
         errorMessage = 'Resource not found';
       } else if (response.status === 500) {
-        errorMessage = 'Server error. Please try again later.';
+        // Use the server's error message if available, otherwise use generic message
+        errorMessage = data.error || data.message || 'Server error. Please try again later.';
+        console.error('Server error details:', {
+          status: response.status,
+          error: data.error,
+          message: data.message,
+          data,
+        });
       } else if (response.status === 401 || response.status === 403) {
         errorMessage = 'Authentication error. Please refresh the page.';
       }
 
       const error = new Error(errorMessage);
       error.status = response.status;
+      error.originalData = data;
       throw error;
     }
 
@@ -229,6 +237,33 @@ export const edgeFunctionHelpers = {
     }),
   },
 
+  upsellings: {
+    getByEventId: (eventId) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'getByEventId', eventId },
+    }),
+    getById: (id) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'getById', id },
+    }),
+    create: (data) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'create', data },
+    }),
+    update: (id, data) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'update', id, data },
+    }),
+    delete: (id) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'delete', id },
+    }),
+    checkAvailability: (upsellingId, quantity) => callEdgeFunction('upsellings', {
+      method: 'POST',
+      body: { action: 'checkAvailability', upsellingId, quantity },
+    }),
+  },
+
   orders: {
     getAll: (filters = {}) => callEdgeFunction('orders', {
       method: 'POST',
@@ -249,6 +284,18 @@ export const edgeFunctionHelpers = {
     calculateTotal: (items, discountCodeId) => callEdgeFunction('orders', {
       method: 'POST',
       body: { action: 'calculateTotal', items, discountCodeId },
+    }),
+    addItemsToOrder: (id, items) => callEdgeFunction('orders', {
+      method: 'POST',
+      body: { action: 'addItemsToOrder', id, items },
+    }),
+    updatePendingItems: (id, items, upsellingDiscountAmount = 0) => callEdgeFunction('orders', {
+      method: 'POST',
+      body: { action: 'updatePendingItems', id, items, upsellingDiscountAmount },
+    }),
+    update: (id, items, upsellingDiscountAmount = 0, customerName = null, customerEmail = null) => callEdgeFunction('orders', {
+      method: 'POST',
+      body: { action: 'update', id, items, upsellingDiscountAmount, customerName, customerEmail },
     }),
     delete: (id) => callEdgeFunction('orders', {
       method: 'POST',
@@ -293,6 +340,10 @@ export const edgeFunctionHelpers = {
       method: 'POST',
       body: { action: 'getSubmissions', formId },
     }),
+    updateSubmission: (submissionId, responses) => callEdgeFunction('forms', {
+      method: 'POST',
+      body: { action: 'updateSubmission', submissionId, responses },
+    }),
   },
 
   discounts: {
@@ -330,6 +381,7 @@ export const edgeFunctionHelpers = {
     createPaymentSession: (orderId) => callEdgeFunction('payments', {
       method: 'POST',
       body: { action: 'createPaymentSession', orderId },
+      timeout: 60000, // 60 seconds - AccruPay session creation can take longer
     }),
     confirmFreePayment: (orderId) => callEdgeFunction('payments', {
       method: 'POST',
@@ -350,6 +402,10 @@ export const edgeFunctionHelpers = {
     getProviders: () => callEdgeFunction('payments', {
       method: 'POST',
       body: { action: 'getProviders' },
+    }),
+    chargeUpsellings: (orderId, items) => callEdgeFunction('payments', {
+      method: 'POST',
+      body: { action: 'chargeUpsellings', orderId, items },
     }),
   },
 };

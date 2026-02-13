@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import GooglePlacesAutocomplete from '@src/components/global/Inputs/GooglePlacesAutocomplete';
 import Loader from '@src/components/global/Loader';
-import { $events, $tickets } from '@src/signals';
+import { $events, $tickets, $upsellings, $discounts } from '@src/signals';
 import { useState } from 'react';
 import {
   Badge,
@@ -22,10 +22,11 @@ import {
   Tabs,
 } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
-import DiscountsManager from './DiscountsManager';
+// import DiscountsManager from './DiscountsManager';
 import FormsManager from './FormsManager';
 import SalesManager from './SalesManager';
-import TicketsManager from './TicketsManager';
+// import TicketsManager from './TicketsManager';
+// import UpsellingsManager from './UpsellingsManager';
 import { getStatusBadge, loadEventData } from './_helpers/eventDetail.events';
 import {
   $eventForm,
@@ -39,6 +40,8 @@ function EventDetail() {
   const navigate = useNavigate();
   const event = $events.value.current;
   const tickets = $tickets.value.list;
+  const upsellings = $upsellings.value.list;
+  const discounts = $discounts.value.list;
   const loading = $events.value.isLoading;
   const formData = $eventForm.value;
   const formLoading = $eventForm.value.isLoading;
@@ -194,25 +197,35 @@ function EventDetail() {
               </Card>
             </Tab>
 
-            <Tab eventKey="tickets" title="Tickets">
+            {/* <Tab eventKey="tickets" title="Tickets">
               <TicketsManager
                 eventId={id}
                 tickets={tickets}
                 onUpdate={() => loadEventData(id)}
               />
-            </Tab>
+            </Tab> */}
 
             <Tab eventKey="forms" title="Forms">
               <FormsManager
                 eventId={id}
                 tickets={tickets}
+                upsellings={upsellings}
+                discounts={discounts}
                 onUpdate={() => loadEventData(id)}
               />
             </Tab>
 
-            <Tab eventKey="discounts" title="Discount Codes">
+            {/* <Tab eventKey="upsellings" title="Upsellings">
+              <UpsellingsManager
+                eventId={id}
+                upsellings={upsellings}
+                onUpdate={() => loadEventData(id)}
+              />
+            </Tab> */}
+
+            {/* <Tab eventKey="discounts" title="Discount Codes">
               <DiscountsManager eventId={id} />
-            </Tab>
+            </Tab> */}
 
             <Tab eventKey="sales" title="Sales">
               <SalesManager eventId={id} />

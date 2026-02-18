@@ -85,10 +85,12 @@ Deno.serve(async (req: Request) => {
               id,
               order_id,
               ticket_type_id,
+              upselling_id,
               quantity,
               unit_price,
               subtotal,
-              ticket_types(name)
+              ticket_types(name),
+              upsellings(item)
             )
           `);
 
@@ -763,6 +765,7 @@ Deno.serve(async (req: Request) => {
         const updateData: any = {
           subtotal: newSubtotal.toFixed(2),
           discount_amount: newDiscountAmount.toFixed(2),
+          discount_code_id: discountCodeId,
           total: newTotal.toFixed(2),
           updated_at: new Date().toISOString(),
         };

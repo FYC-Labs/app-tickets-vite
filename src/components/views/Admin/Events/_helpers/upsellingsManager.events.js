@@ -3,6 +3,23 @@ import { Signal } from '@fyclabs/tools-fyc-react/signals';
 import { upsellingsAPI } from '@src/api/upsellings.api';
 import { showToast } from '@src/components/global/Alert/_helpers/alert.events';
 
+export const DISCOUNT_TYPES = {
+  NO_DISCOUNT: 'No Discount',
+  PERCENT: 'Percent',
+  FIXED: 'Fixed',
+};
+
+export const QUANTITY_RULES = {
+  ONLY_ONE: 'Only One',
+  MATCHES_TICKET_COUNT: 'Matches Ticket Count',
+  USER_CAN_CHANGE: 'User Can Change',
+};
+
+export const MANAGE_INVENTORY = {
+  YES: 'Yes',
+  NO: 'NO',
+};
+
 export const $upsellingForm = Signal({
   name: '',
   description: '',
@@ -18,6 +35,10 @@ export const $upsellingForm = Signal({
   discount_value: '',
   quantity_rule: 'ONLY_ONE',
   manage_inventory: 'NO',
+  failedImageUrls: {},
+  signedImageUrls: {},
+  imagesUploading: false,
+  uploadingPreviews: [],
 });
 
 export const $upsellingUI = Signal({

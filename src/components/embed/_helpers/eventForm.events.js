@@ -44,7 +44,16 @@ export const loadFormData = async (formId, eventId) => {
           return start <= now && now <= end && available > 0;
         });
 
-        $embed.update({ tickets: filtered, upsellings: upsellingsData });
+        let filteredUpsellings = upsellingsData.filter((u) => formData.available_upselling_ids.includes(u.id));
+
+        filteredUpsellings = filteredUpsellings.filter((u) => {
+          const start = new Date(u.sales_start);
+          const end = new Date(u.sales_end);
+          const available = (u.quantity || 0) - (u.sold || 0);
+          return start <= now && now <= end && available > 0;
+        });
+
+        $embed.update({ tickets: filtered, upsellings: filteredUpsellings });
       }
     } else if (eventId) {
       // Fetch providers and tickets in parallel
@@ -244,6 +253,7 @@ export const handleApplyDiscount = async (formId, eventId) => {
               order.id,
               orderItems,
               totals.discount_amount,
+              $embed.value.appliedDiscount?.id,
               formData.name,
               formData.email,
             );

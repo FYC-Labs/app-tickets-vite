@@ -130,9 +130,6 @@ export const handleUpsellingSelection = (upsellingId) => {
     ? currentIds.filter((id) => id !== idStr)
     : [...currentIds, idStr];
 
-  // eslint-disable-next-line no-console
-  console.debug('[FormsManager] toggle upselling', idStr, 'isSelected:', !isSelected, 'newIds:', newIds);
-
   $formManagerForm.value = {
     ...$formManagerForm.value,
     available_upselling_ids: newIds,

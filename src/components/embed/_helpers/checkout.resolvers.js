@@ -1,7 +1,8 @@
 import { $checkout } from '@src/signals';
 import ordersAPI from '@src/api/orders.api';
 import paymentsAPI from '@src/api/payments.api';
-import { sessionInitError } from './checkout.consts';
+import upsellingsAPI from '@src/api/upsellings.api';
+import { sessionInitError, postCheckoutUpsellings } from './checkout.consts';
 
 export const loadOrderData = async (orderId) => {
   try {
@@ -16,9 +17,11 @@ export const loadOrderData = async (orderId) => {
     }
 
     if (orderData.status === 'PAID') {
+      const formData = orderData.form_submissions?.forms || null;
       $checkout.update({
         order: orderData,
         paymentStatus: 'completed',
+        form: formData,
       });
       return;
     }
@@ -131,5 +134,51 @@ export const fetchPaymentSession = async (orderId) => {
       $checkout.update({ error: errorMsg });
     }
     throw err;
+  }
+};
+
+const getFormFromOrder = (order, fallbackForm) => {
+  if (order?.form_submissions?.forms) {
+    const { forms } = order.form_submissions;
+    return Array.isArray(forms) ? forms[0] : forms;
+  }
+  return fallbackForm ?? null;
+};
+
+export const loadPostCheckoutUpsellings = async (eventId, order = null, fallbackForm = null) => {
+  try {
+    if (!eventId) {
+      postCheckoutUpsellings.value = [];
+      return;
+    }
+
+    const form = getFormFromOrder(order, fallbackForm);
+
+    const allUpsellings = await upsellingsAPI.getByEventId(eventId);
+    const now = new Date();
+
+    let availableUpsellings = (allUpsellings || []).filter((upselling) => {
+      if (upselling.upselling_strategy !== 'POST-CHECKOUT') {
+        return false;
+      }
+      const start = new Date(upselling.sales_start);
+      const end = new Date(upselling.sales_end);
+      const available = (upselling.quantity || 0) - (upselling.sold || 0);
+      return start <= now && now <= end && available > 0;
+    });
+
+    if (form && 'available_upselling_ids' in form) {
+      if (form.available_upselling_ids && Array.isArray(form.available_upselling_ids) && form.available_upselling_ids.length > 0) {
+        const availableIds = form.available_upselling_ids.map(String);
+        availableUpsellings = availableUpsellings.filter((u) => availableIds.includes(String(u.id)));
+      } else {
+        // if available_upsellings_ids is defined but empty, do not show any upselling
+        availableUpsellings = [];
+      }
+    }
+
+    postCheckoutUpsellings.value = availableUpsellings;
+  } catch (err) {
+    postCheckoutUpsellings.value = [];
   }
 };

@@ -17,7 +17,10 @@
     "migrate": "supabase db push",
     "deploy": "VITE_APP_ENV=production vite build && firebase deploy --only hosting",
     "deploy:hosting": "firebase deploy --only hosting",
-    "deploy:all": "supabase functions deploy && supabase db push && VITE_APP_ENV=production vite build && firebase deploy --only hosting"
+    "deploy:all": "supabase functions deploy && supabase db push && VITE_APP_ENV=production vite build && firebase deploy --only hosting",
+    "deploy:functions:qa": "supabase functions deploy --branch qa",
+    "deploy:db:qa": "supabase db push --db-url $DATABASE_URL_QA",
+    "link:db:main": "supabase link --project-ref ttctclwuiwfudfzdcaux --db-branch main"
   },
   "dependencies": {
     "@accrupay/node": "^0.15.1",
@@ -43,6 +46,7 @@
     "react-router-dom": "^6.21.2",
     "react-select": "^5.10.0",
     "sass": "1.35.1",
+    "uuid": "^13.0.0",
     "vite-plugin-svgr": "^4.2.0",
     "yalc": "^1.0.0-pre.53"
   },
@@ -58,6 +62,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "sass": "^1.69.7",
+    "supabase": "^2.72.7",
     "vite": "^5.0.8",
     "yarn": "^1.22.21"
   }

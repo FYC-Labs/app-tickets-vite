@@ -45,7 +45,9 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
         quantity,
         unit_price,
         subtotal,
-        ticket_types(name)
+        custom_fields,
+        ticket_types(name),
+        upsellings(item)
       )
     `,
     )
@@ -66,7 +68,7 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
   }
 
   let formSubmission = null;
-  
+
   if (orderData.form_submission_id) {
     const { data: submission, error: submissionError } = await supabaseClient
       .from("form_submissions")
@@ -93,14 +95,6 @@ async function getOrderAndEventData(orderId: string, supabaseClient: any) {
 
   orderData.form_submissions = formSubmission;
 
-  console.log("[DEBUG] Form submissions data:", {
-    orderId,
-    form_submission_id: orderData.form_submission_id,
-    form_submissions: orderData.form_submissions,
-    form_submissions_type: typeof orderData.form_submissions,
-    is_array: Array.isArray(orderData.form_submissions),
-  });
-
   return orderData;
 }
 
@@ -113,9 +107,12 @@ function buildCustomerAttributes(orderData: any) {
   // Build order items array with details
   const orderItemsArr = (orderData.order_items || []).map((item: any) => ({
     ticketTypeName: item.ticket_types?.name || "",
+    upsellingName: item.upsellings?.item || item.upsellings?.name || "",
+    upsellingId: item.upsellings?.id || "",
     quantity: item.quantity,
     unitPrice: item.unit_price,
     subtotal: item.subtotal,
+    custom_fields: item.custom_fields || {},
   }));
 
   const formResponses = orderData.form_submissions?.responses || null;
@@ -164,15 +161,6 @@ function buildCustomerAttributes(orderData: any) {
 
     form_responses: formResponses,
   };
-
-  console.log("[DEBUG] Form responses extraction:", {
-    form_submissions_raw: orderData.form_submissions,
-    form_responses_extracted: formResponses,
-    phone_number_from_form: formPhoneNumber,
-    preferred_channel_from_form: formPreferredChannel,
-    final_phone_in_attributes: attributes.phone,
-    final_preferred_channel_in_attributes: attributes.preferred_channel,
-  });
 
   // Add custom attribute if configured
   const customKey = event.customerio_custom_attribute_key;
@@ -247,14 +235,16 @@ export async function syncOrderStatusToCustomerIO(
 
     const customerAttributes = buildCustomerAttributes(orderData);
 
-    console.log("[DEBUG] Customer attributes before Customer.io sync:", {
-      orderId,
-      customer_email: orderData.customer_email,
-      form_responses: customerAttributes.form_responses,
-      has_form_responses: !!customerAttributes.form_responses,
-      phone: customerAttributes.phone,
-      preferred_channel: customerAttributes.preferred_channel,
-    });
+    // Ensure both form_responses and order_items are present in attributes
+    // form_responses can be null if no form submission exists, but should be explicitly set
+    if (!('form_responses' in customerAttributes)) {
+      customerAttributes.form_responses = null;
+    }
+
+    // order_items should always be an array, even if empty
+    if (!('order_items' in customerAttributes)) {
+      customerAttributes.order_items = [];
+    }
 
     const identifyResult = await identifyCustomer(
       {
@@ -266,9 +256,6 @@ export async function syncOrderStatusToCustomerIO(
     );
 
     if (identifyResult.success) {
-      console.log(
-        `Order status synced to Customer.io for order ${orderId}, customer ${orderData.customer_email}, status: ${orderData.status}`,
-      );
       return { success: true };
     } else {
       console.warn(

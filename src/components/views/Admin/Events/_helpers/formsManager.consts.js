@@ -13,3 +13,15 @@ export const $formsView = Signal({
   selectedItems: [],
   isSelectAllChecked: false,
 });
+
+export const FIELD_TYPES = [
+  { value: 'text', label: 'Text' },
+  { value: 'email', label: 'Email' },
+  { value: 'number', label: 'Number' },
+  { value: 'tel', label: 'Phone' },
+  { value: 'textarea', label: 'Textarea' },
+  { value: 'select', label: 'Select' },
+  { value: 'checkbox', label: 'Checkbox' },
+  { value: 'radio', label: 'Radio' },
+  { value: 'date', label: 'Date' },
+];

@@ -8,12 +8,15 @@ export const $formManagerForm = Signal({
   name: '',
   description: '',
   available_ticket_ids: [],
+  available_upselling_ids: [],
   schema: [],
   is_published: false,
   show_title: true,
   show_description: true,
   show_discount_code: true,
   show_tickets_remaining: true,
+  request_phone_number: false,
+  request_communication_preference: false,
   theme: 'light',
   order_confirmation_url: '',
 });
@@ -52,16 +55,21 @@ export const loadForms = async (eventId) => {
 
 export const handleOpenModal = (form = null) => {
   if (form) {
+    // eslint-disable-next-line no-console
+    console.debug('[FormsManager] handleOpenModal form.available_upselling_ids =', form.available_upselling_ids);
     $formManagerForm.update({
       name: form.name,
       description: form.description || '',
       available_ticket_ids: form.available_ticket_ids || [],
+      available_upselling_ids: form.available_upselling_ids || [],
       schema: form.schema || [],
       is_published: form.is_published || false,
       show_title: form.show_title !== undefined ? form.show_title : true,
       show_description: form.show_description !== undefined ? form.show_description : true,
       show_discount_code: form.show_discount_code !== undefined ? form.show_discount_code : true,
       show_tickets_remaining: form.show_tickets_remaining !== undefined ? form.show_tickets_remaining : true,
+      request_phone_number: form.request_phone_number ?? false,
+      request_communication_preference: form.request_communication_preference ?? false,
       theme: form.theme || 'light',
       order_confirmation_url: form.order_confirmation_url || '',
     });
@@ -110,6 +118,21 @@ export const handleTicketSelection = (ticketId) => {
   $formManagerForm.value = {
     ...$formManagerForm.value,
     available_ticket_ids: newIds,
+  };
+};
+
+export const handleUpsellingSelection = (upsellingId) => {
+  const idStr = String(upsellingId);
+  const currentIds = ($formManagerForm.value.available_upselling_ids || []).map(String);
+  const isSelected = currentIds.includes(idStr);
+
+  const newIds = isSelected
+    ? currentIds.filter((id) => id !== idStr)
+    : [...currentIds, idStr];
+
+  $formManagerForm.value = {
+    ...$formManagerForm.value,
+    available_upselling_ids: newIds,
   };
 };
 
@@ -220,14 +243,18 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       description: formData.description,
       event_id: eventId,
       available_ticket_ids: formData.available_ticket_ids,
+      available_upselling_ids: formData.available_upselling_ids,
       schema: formData.schema,
       is_published: formData.is_published,
       show_title: formData.show_title,
       show_description: formData.show_description,
       show_discount_code: formData.show_discount_code,
       show_tickets_remaining: formData.show_tickets_remaining,
+      request_phone_number: formData.request_phone_number ?? false,
+      request_communication_preference: formData.request_communication_preference ?? false,
       theme: formData.theme,
       order_confirmation_url: formData.order_confirmation_url || null,
+      upsellings_display: formData.upsellings_display || 'LIST',
     };
 
     const { editingForm } = $formManagerUI.value;
@@ -248,6 +275,9 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       await formsAPI.create(submitData);
       showToast('Form created successfully', 'success');
     }
+
+    // Reload forms list so available_upselling_ids / available_ticket_ids are fresh in $forms
+    await loadForms(eventId);
 
     handleCloseModal();
     if (onUpdate) await onUpdate();

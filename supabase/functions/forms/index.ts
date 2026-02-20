@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
       SUPABASE_SERVICE_ROLE_KEY
     );
 
-    const { action, filters, id, formId, responses, email, data } = await req.json();
+    const { action, filters, id, formId, submissionId, responses, email, data } = await req.json();
 
     let result;
 
@@ -100,6 +100,31 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        if (data.available_upselling_ids && data.available_upselling_ids.length > 0) {
+          const { data: upsellings, error: upsellingError } = await supabaseClient
+            .from("upsellings")
+            .select("id")
+            .eq("event_id", data.event_id)
+            .in("id", data.available_upselling_ids);
+            
+          if (upsellingError) throw upsellingError;
+
+          if (!upsellings || upsellings.length === 0) {
+            // No valid upsellings found - clear the array
+            data.available_upselling_ids = [];
+          } else if (upsellings.length !== data.available_upselling_ids.length) {
+            // Some upsellings are invalid - filter to only valid ones
+            const validUpsellingIds = upsellings.map((u) => u.id);
+            const invalidCount = data.available_upselling_ids.length - validUpsellingIds.length;
+            data.available_upselling_ids = validUpsellingIds;
+          }
+
+          // Log warning but don't throw error - just use valid upsellings
+          console.warn(
+            `Filtered out ${invalidCount} invalid upselling ID(s) that don't belong to event ${data.event_id}`
+          );
+        }
+
         // created_by should be passed in the data from the client
         // It should be the user's Supabase ID (from users table, not auth.users)
         const { data: form, error } = await supabaseClient
@@ -156,6 +181,30 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        if (data.available_upselling_ids && data.available_upselling_ids.length > 0 && eventId) {
+          const { data: upsellings, error: upsellingError } = await supabaseClient
+            .from("upsellings")
+            .select("id")
+            .eq("event_id", eventId)
+            .in("id", data.available_upselling_ids);
+            
+          if (upsellingError) throw upsellingError;
+
+          if (!upsellings || upsellings.length === 0) {
+            // No valid upsellings found - clear the array
+            data.available_upselling_ids = [];
+          } else if (upsellings.length !== data.available_upselling_ids.length) {
+            // Some upsellings are invalid - filter to only valid ones
+            const validUpsellingIds = upsellings.map((u) => u.id);
+            const invalidCount = data.available_upselling_ids.length - validUpsellingIds.length;
+            data.available_upselling_ids = validUpsellingIds;
+          // Log warning but don't throw error - just use valid upsellings
+            console.warn(
+              `Filtered out ${invalidCount} invalid upselling ID(s) that don't belong to event ${eventId}`
+            );
+          }
+        }
+
         const { data: form, error } = await supabaseClient
           .from("forms")
           .update({
@@ -204,6 +253,41 @@ Deno.serve(async (req: Request) => {
 
         if (error) throw error;
         result = { data: submissions };
+        break;
+      }
+
+      case "updateSubmission": {
+        if (!submissionId) {
+          throw new Error("submissionId is required for updateSubmission");
+        }
+        if (responses == null || typeof responses !== "object") {
+          throw new Error("responses must be an object");
+        }
+        const { data: existing, error: fetchError } = await supabaseClient
+          .from("form_submissions")
+          .select("responses")
+          .eq("id", submissionId)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!existing) {
+          throw new Error("Form submission not found");
+        }
+
+        const currentResponses = (existing.responses != null && typeof existing.responses === "object")
+          ? existing.responses
+          : {};
+        const mergedResponses = { ...currentResponses, ...responses };
+
+        const { data: updated, error: updateError } = await supabaseClient
+          .from("form_submissions")
+          .update({ responses: mergedResponses })
+          .eq("id", submissionId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        result = { data: updated };
         break;
       }
 

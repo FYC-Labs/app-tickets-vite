@@ -22,11 +22,11 @@ import {
   Tabs,
 } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
-// import DiscountsManager from './DiscountsManager';
+import DiscountsManager from './DiscountsManager';
 import FormsManager from './FormsManager';
 import SalesManager from './SalesManager';
-// import TicketsManager from './TicketsManager';
-// import UpsellingsManager from './UpsellingsManager';
+import TicketsManager from './TicketsManager';
+import UpsellingsManager from './UpsellingsManager';
 import { getStatusBadge, loadEventData } from './_helpers/eventDetail.events';
 import {
   $eventForm,
@@ -197,14 +197,6 @@ function EventDetail() {
               </Card>
             </Tab>
 
-            {/* <Tab eventKey="tickets" title="Tickets">
-              <TicketsManager
-                eventId={id}
-                tickets={tickets}
-                onUpdate={() => loadEventData(id)}
-              />
-            </Tab> */}
-
             <Tab eventKey="forms" title="Forms">
               <FormsManager
                 eventId={id}
@@ -215,17 +207,25 @@ function EventDetail() {
               />
             </Tab>
 
-            {/* <Tab eventKey="upsellings" title="Upsellings">
+            <Tab eventKey="tickets" title="Tickets">
+              <TicketsManager
+                eventId={id}
+                tickets={tickets}
+                onUpdate={() => loadEventData(id)}
+              />
+            </Tab>
+
+            <Tab eventKey="upsellings" title="Upsellings">
               <UpsellingsManager
                 eventId={id}
                 upsellings={upsellings}
                 onUpdate={() => loadEventData(id)}
               />
-            </Tab> */}
+            </Tab>
 
-            {/* <Tab eventKey="discounts" title="Discount Codes">
+            <Tab eventKey="discounts" title="Discount Codes">
               <DiscountsManager eventId={id} />
-            </Tab> */}
+            </Tab>
 
             <Tab eventKey="sales" title="Sales">
               <SalesManager eventId={id} />

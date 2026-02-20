@@ -196,7 +196,7 @@ function SalesManager({ eventId }) {
                   <td>
                     {order.order_items?.map((item, idx) => (
                       <div key={idx} className="small">
-                        {item.quantity}x {item.ticket_types?.name || 'Ticket'}
+                        {item.quantity}x {item.ticket_types?.name || item.upsellings?.item || 'Ticket'}
                       </div>
                     )) || '-'}
                   </td>

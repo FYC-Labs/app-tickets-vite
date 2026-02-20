@@ -61,18 +61,21 @@ export async function sendTransactionalEmail(
 
   try {
     // Prepare the payload for Customer.io Transactional API
+    // message_data = full trigger data (order_items, order_total, custom_fields, etc.) for template variables
     const payload = {
       transactional_message_id: config.transactionalTemplateId,
       to: orderData.email,
       identifiers: {
         email: orderData.email,
       },
-      message_data: {
-        name: orderData.name,
-        email: orderData.email,
-        orderId: orderData.orderId,
-        purchasedAt: orderData.purchasedAt,
-      },
+      message_data: typeof orderData === "object" && orderData !== null
+        ? { ...orderData }
+        : {
+            name: orderData.name,
+            email: orderData.email,
+            orderId: orderData.orderId,
+            purchasedAt: orderData.purchasedAt,
+          },
     };
 
     // Make the API request to Customer.io using App API Key with Bearer auth

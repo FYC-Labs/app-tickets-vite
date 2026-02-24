@@ -1,4 +1,4 @@
-import { Card, Table, Badge, ButtonGroup, Button } from 'react-bootstrap';
+import { Card, Table, Badge, ButtonGroup, Button, Dropdown } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDownload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { format } from 'date-fns';
@@ -6,14 +6,35 @@ import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
 import Loader from '@src/components/global/Loader';
 import UniversalModal from '@src/components/global/UniversalModal';
 import { showToast } from '@src/components/global/Alert/_helpers/alert.events';
-import { $sales, loadSales, setStatusFilter, exportToCSV, showDeleteConfirmation, hideDeleteConfirmation, deleteOrder } from './_helpers/salesManager.events';
-import { $statusFilter, $deleteOrder } from './_helpers/salesManager.consts';
+import { $sales, loadSales, setStatusFilter, exportToCSV, showDeleteConfirmation, hideDeleteConfirmation, deleteOrder, toggleTicketInFilter, setTicketFilter } from './_helpers/salesManager.events';
+import { $statusFilter, $ticketFilter, $deleteOrder } from './_helpers/salesManager.consts';
+
+function getUniqueTicketNames(orders) {
+  const names = new Set();
+  orders.forEach((order) => {
+    order.order_items?.forEach((item) => {
+      const name = item.ticket_types?.name || item.upsellings?.item;
+      if (name) names.add(name);
+    });
+  });
+  return Array.from(names).sort();
+}
 
 function SalesManager({ eventId }) {
   const { orders } = $sales.value;
   const loading = $sales.value.isLoading;
   const statusFilter = $statusFilter.value;
+  const ticketFilter = $ticketFilter.value;
   const orderToDelete = $deleteOrder.value;
+
+  const ticketOptions = getUniqueTicketNames(orders);
+  const filteredOrders =
+    ticketFilter.length === 0
+      ? orders
+      : orders.filter((order) => order.order_items?.some((item) => {
+        const name = item.ticket_types?.name || item.upsellings?.item;
+        return name && ticketFilter.includes(name);
+      }));
 
   useEffectAsync(async () => {
     await loadSales(eventId);
@@ -76,7 +97,7 @@ function SalesManager({ eventId }) {
   };
 
   const handleExportCSV = () => {
-    exportToCSV(orders, eventId);
+    exportToCSV(filteredOrders, eventId);
   };
 
   if (loading) return <Loader />;
@@ -110,7 +131,58 @@ function SalesManager({ eventId }) {
                 Pending
               </Button>
             </ButtonGroup>
-            {orders.length > 0 && (
+            {ticketOptions.length > 0 && (
+              <Dropdown align="end" className="d-inline-block">
+                <Dropdown.Toggle
+                  variant={ticketFilter.length > 0 ? 'primary' : 'outline-secondary'}
+                  size="sm"
+                  id="ticket-filter-dropdown"
+                >
+                  Tickets {ticketFilter.length > 0 ? `(${ticketFilter.length})` : ''}
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  {ticketFilter.length > 0 && (
+                    <>
+                      <Dropdown.Item
+                        as="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setTicketFilter([]);
+                        }}
+                      >
+                        Clear selection
+                      </Dropdown.Item>
+                      <Dropdown.Divider />
+                    </>
+                  )}
+                  {ticketOptions.map((name) => {
+                    const isChecked = ticketFilter.includes(name);
+                    return (
+                      <Dropdown.Item
+                        key={name}
+                        as="div"
+                        className="px-3 d-flex align-items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="form-check-input me-2"
+                          id={`ticket-filter-${name}`}
+                          checked={isChecked}
+                          onChange={() => toggleTicketInFilter(name)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Filter by ${name}`}
+                        />
+                        <label className="form-check-label mb-0 flex-grow-1" htmlFor={`ticket-filter-${name}`}>
+                          {name}
+                        </label>
+                      </Dropdown.Item>
+                    );
+                  })}
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
+            {filteredOrders.length > 0 && (
               <Button
                 variant="outline-success"
                 size="sm"
@@ -121,22 +193,22 @@ function SalesManager({ eventId }) {
               </Button>
             )}
             <div className="text-muted small">
-              {orders.length} order{orders.length !== 1 ? 's' : ''}
+              {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
 
-        {orders.length > 0 && (
+        {filteredOrders.length > 0 && (
           <div className="mb-24 pb-24 border-bottom">
             <div className="row">
               <div className="col-md-3">
                 <div className="text-muted small">Total Orders</div>
-                <div className="h4 mb-0">{orders.length}</div>
+                <div className="h4 mb-0">{filteredOrders.length}</div>
               </div>
               <div className="col-md-3">
                 <div className="text-muted small">Total Tickets Sold</div>
                 <div className="h4 mb-0">
-                  {orders
+                  {filteredOrders
                     .filter((order) => order.status === 'PAID')
                     .reduce((sum, order) => sum + (order.order_items?.reduce((itemSum, item) => itemSum + item.quantity, 0) || 0), 0)}
                 </div>
@@ -144,22 +216,24 @@ function SalesManager({ eventId }) {
               <div className="col-md-3">
                 <div className="text-muted small">Total Revenue</div>
                 <div className="h4 mb-0">
-                  ${orders.reduce((sum, order) => sum + parseFloat(order.total || 0), 0).toFixed(2)}
+                  ${filteredOrders.reduce((sum, order) => sum + parseFloat(order.total || 0), 0).toFixed(2)}
                 </div>
               </div>
               <div className="col-md-3">
                 <div className="text-muted small">Total Discounts</div>
                 <div className="h4 mb-0 text-success">
-                  ${orders.reduce((sum, order) => sum + parseFloat(order.discount_amount || 0), 0).toFixed(2)}
+                  ${filteredOrders.reduce((sum, order) => sum + parseFloat(order.discount_amount || 0), 0).toFixed(2)}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {orders.length === 0 ? (
+        {filteredOrders.length === 0 ? (
           <div className="text-center py-5 text-muted">
-            No orders yet for this event
+            {orders.length === 0
+              ? 'No orders yet for this event'
+              : 'No orders match the selected ticket filter'}
           </div>
         ) : (
           <Table responsive hover>
@@ -177,7 +251,7 @@ function SalesManager({ eventId }) {
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
+              {filteredOrders.map((order) => (
                 <tr key={order.id}>
                   <td
                     className="font-monospace small"

@@ -1,9 +1,8 @@
-import { Card, Table, Badge, ButtonGroup, Button, Dropdown } from 'react-bootstrap';
+import { Card, Table, Badge, ButtonGroup, Button, Dropdown, Spinner } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faDownload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { format } from 'date-fns';
 import { useEffectAsync } from '@fyclabs/tools-fyc-react/utils';
-import Loader from '@src/components/global/Loader';
 import UniversalModal from '@src/components/global/UniversalModal';
 import { showToast } from '@src/components/global/Alert/_helpers/alert.events';
 import { $sales, loadSales, setStatusFilter, exportToCSV, showDeleteConfirmation, hideDeleteConfirmation, deleteOrder, toggleTicketInFilter, setTicketFilter } from './_helpers/salesManager.events';
@@ -100,7 +99,15 @@ function SalesManager({ eventId }) {
     exportToCSV(filteredOrders, eventId);
   };
 
-  if (loading) return <Loader />;
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center py-5">
+        <Spinner animation="border" role="status" variant="primary">
+          <span className="visually-hidden">Loading sales data...</span>
+        </Spinner>
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -140,7 +147,7 @@ function SalesManager({ eventId }) {
                 >
                   Tickets {ticketFilter.length > 0 ? `(${ticketFilter.length})` : ''}
                 </Dropdown.Toggle>
-                <Dropdown.Menu>
+                <Dropdown.Menu className="ticket-filter-menu">
                   {ticketFilter.length > 0 && (
                     <>
                       <Dropdown.Item
@@ -166,7 +173,7 @@ function SalesManager({ eventId }) {
                       >
                         <input
                           type="checkbox"
-                          className="form-check-input me-2"
+                          className="ticket-filter-checkbox me-2 ms-0 flex-shrink-0"
                           id={`ticket-filter-${name}`}
                           checked={isChecked}
                           onChange={() => toggleTicketInFilter(name)}

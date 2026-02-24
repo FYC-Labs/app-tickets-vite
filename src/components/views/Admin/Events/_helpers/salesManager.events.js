@@ -12,6 +12,7 @@ export const $sales = Signal({
 export const loadSales = async (eventId) => {
   try {
     $sales.loadingStart();
+    $sales.update({ isLoading: true });
     const filters = { event_id: eventId };
     if ($statusFilter.value) {
       filters.status = $statusFilter.value;
@@ -23,6 +24,7 @@ export const loadSales = async (eventId) => {
     showToast('Error loading sales data', 'error');
   } finally {
     $sales.loadingEnd();
+    $sales.update({ isLoading: false });
   }
 };
 

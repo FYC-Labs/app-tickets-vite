@@ -2,7 +2,7 @@ import { Signal } from '@fyclabs/tools-fyc-react/signals';
 import ordersAPI from '@src/api/orders.api';
 import { showToast } from '@src/components/global/Alert/_helpers/alert.events';
 import { format } from 'date-fns';
-import { $statusFilter, $deleteOrder } from './salesManager.consts';
+import { $statusFilter, $ticketFilter, $deleteOrder } from './salesManager.consts';
 
 export const $sales = Signal({
   orders: [],
@@ -12,6 +12,7 @@ export const $sales = Signal({
 export const loadSales = async (eventId) => {
   try {
     $sales.loadingStart();
+    $sales.update({ isLoading: true });
     const filters = { event_id: eventId };
     if ($statusFilter.value) {
       filters.status = $statusFilter.value;
@@ -23,11 +24,25 @@ export const loadSales = async (eventId) => {
     showToast('Error loading sales data', 'error');
   } finally {
     $sales.loadingEnd();
+    $sales.update({ isLoading: false });
   }
 };
 
 export const setStatusFilter = (status) => {
   $statusFilter.value = status;
+};
+
+export const setTicketFilter = (selectedNames) => {
+  $ticketFilter.value = Array.isArray(selectedNames) ? selectedNames : [];
+};
+
+export const toggleTicketInFilter = (name) => {
+  if (!name) return;
+  const current = $ticketFilter.value;
+  const next = current.includes(name)
+    ? current.filter((n) => n !== name)
+    : [...current, name];
+  $ticketFilter.value = next;
 };
 
 export const exportToCSV = (orders, eventId) => {

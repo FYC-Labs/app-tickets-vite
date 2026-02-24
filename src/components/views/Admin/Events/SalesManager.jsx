@@ -208,11 +208,11 @@ function SalesManager({ eventId }) {
         {filteredOrders.length > 0 && (
           <div className="mb-24 pb-24 border-bottom">
             <div className="row">
-              <div className="col-md-3">
+              <div className="col-md-2">
                 <div className="text-muted small">Total Orders</div>
                 <div className="h4 mb-0">{filteredOrders.length}</div>
               </div>
-              <div className="col-md-3">
+              <div className="col-md-2">
                 <div className="text-muted small">Total Tickets Sold</div>
                 <div className="h4 mb-0">
                   {filteredOrders
@@ -221,12 +221,18 @@ function SalesManager({ eventId }) {
                 </div>
               </div>
               <div className="col-md-3">
+                <div className="text-muted small">Tickets Subtotal</div>
+                <div className="h4 mb-0">
+                  ${filteredOrders.reduce((sum, order) => sum + parseFloat(order.subtotal || 0), 0).toFixed(2)}
+                </div>
+              </div>
+              <div className="col-md-3">
                 <div className="text-muted small">Total Revenue</div>
                 <div className="h4 mb-0">
                   ${filteredOrders.reduce((sum, order) => sum + parseFloat(order.total || 0), 0).toFixed(2)}
                 </div>
               </div>
-              <div className="col-md-3">
+              <div className="col-md-2">
                 <div className="text-muted small">Total Discounts</div>
                 <div className="h4 mb-0 text-success">
                   ${filteredOrders.reduce((sum, order) => sum + parseFloat(order.discount_amount || 0), 0).toFixed(2)}

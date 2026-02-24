@@ -1,13 +1,13 @@
 import { Button, Alert } from 'react-bootstrap';
+import { $embed } from '@src/signals';
 import { showTestCards } from '../_helpers/checkout.consts';
 import * as events from '../_helpers/checkout.events';
 
-function TestCards({ providers }) {
-  // Get environment from providers
-  const env = providers?.[0]?.config?.env || providers?.[0]?.config?.environment;
+function TestCards() {
+  const { providers } = $embed.value;
+  const env = providers?.config?.env || providers?.config?.environment;
 
-  // Only show test cards in dev/sandbox/qa environments
-  if (env !== 'int') {
+  if (env !== 'int' && window.location.hostname !== 'localhost') {
     return null;
   }
 

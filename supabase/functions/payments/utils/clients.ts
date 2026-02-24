@@ -2,7 +2,7 @@
 // @ts-nocheck
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { AccruPay, TRANSACTION_PROVIDER } from "npm:@accrupay/node@0.14.0";
+import { AccruPay, TRANSACTION_PROVIDER } from "npm:@accrupay/node@0.15.1";
 
 export function initializeSupabaseClient() {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";

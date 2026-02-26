@@ -20,7 +20,10 @@
     "deploy:all": "supabase functions deploy && supabase db push && VITE_APP_ENV=production vite build && firebase deploy --only hosting",
     "deploy:functions:qa": "supabase functions deploy --branch qa",
     "deploy:db:qa": "supabase db push --db-url $DATABASE_URL_QA",
-    "link:db:main": "supabase link --project-ref ttctclwuiwfudfzdcaux --db-branch main"
+    "link:db:main": "supabase link --project-ref ttctclwuiwfudfzdcaux --db-branch main",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:run": "npx supabase functions serve --no-verify-jwt"
   },
   "dependencies": {
     "@accrupay/node": "^0.15.1",

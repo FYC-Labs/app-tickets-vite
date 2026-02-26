@@ -40,8 +40,8 @@ export const loadFormData = async (formId, eventId) => {
         filtered = filtered.filter((t) => {
           const start = new Date(t.sales_start);
           const end = new Date(t.sales_end);
-          const available = (t.quantity || 0) - (t.sold || 0);
-          return start <= now && now <= end && available > 0;
+          // const available = (t.quantity || 0) - (t.sold || 0);
+          return start <= now && now <= end; // && available > 0;
         });
 
         let filteredUpsellings = upsellingsData.filter((u) => formData.available_upselling_ids.includes(u.id));
@@ -49,8 +49,8 @@ export const loadFormData = async (formId, eventId) => {
         filteredUpsellings = filteredUpsellings.filter((u) => {
           const start = new Date(u.sales_start);
           const end = new Date(u.sales_end);
-          const available = (u.quantity || 0) - (u.sold || 0);
-          return start <= now && now <= end && available > 0;
+          // const available = (u.quantity || 0) - (u.sold || 0);
+          return start <= now && now <= end; // && available > 0;
         });
 
         $embed.update({ tickets: filtered, upsellings: filteredUpsellings });

@@ -17,9 +17,11 @@ export default function TicketSelection() {
         const available = ticket.quantity - (ticket.sold || 0);
         const selectedQty = selectedTickets[ticket.id] || 0;
         const isSelected = selectedQty > 0;
+        const showAvailability = form?.show_tickets_remaining !== false;
+        const showSoldOutBadge = form?.show_tickets_remaining === false && available === 0;
         return (
           <Row className={`align-items-center mb-16 ${isSelected ? 'selected' : ''} ${available === 0 ? 'sold-out' : ''}`} key={ticket.id} style={{ animationDelay: `${index * 0.1}s` }}>
-            <Col md={form?.show_tickets_remaining !== false ? 6 : 9}>
+            <Col md={showAvailability || showSoldOutBadge ? 6 : 9}>
               <div className="d-flex align-items-start">
                 <div className="flex-grow-1">
                   <h6 className="mb-8">{ticket.name}</h6>
@@ -38,7 +40,7 @@ export default function TicketSelection() {
                 </div>
               </div>
             </Col>
-            {form?.show_tickets_remaining !== false && (
+            {showAvailability && (
               <Col md={3} className="text-center">
                 {available > 0 ? (
                   <Badge bg="primary">
@@ -47,6 +49,11 @@ export default function TicketSelection() {
                 ) : (
                   <Badge bg="danger">Sold out</Badge>
                 )}
+              </Col>
+            )}
+            {showSoldOutBadge && (
+              <Col md={3} className="text-center">
+                <Badge bg="danger">Sold out</Badge>
               </Col>
             )}
             <Col md={3}>

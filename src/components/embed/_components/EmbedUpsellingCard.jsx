@@ -1,4 +1,4 @@
-import { Row, Col, Form, Image } from 'react-bootstrap';
+import { Row, Col, Form, Image, Badge } from 'react-bootstrap';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';
 import { $embed } from '@src/signals';
@@ -37,6 +37,10 @@ export default function EmbedUpsellingCard({
   } else {
     quantityOptions = [...Array(maxQuantity + 1).keys()];
   }
+
+  const showSoldOutBadge = $embed.value.form?.show_tickets_remaining === false && available === 0;
+  const showAvailability = $embed.value.form?.show_tickets_remaining !== false;
+  const showStatusBadge = showAvailability || showSoldOutBadge;
 
   const renderUpsellingCustomField = (field, upsellingId, unitIndex, fieldIndex) => {
     const unitValues = upsellingCustomFields[upsellingId];
@@ -78,7 +82,7 @@ export default function EmbedUpsellingCard({
       style={{ animationDelay: `${index * 0.1}s` }}
     >
       <Row className="align-items-center">
-        <Col md={$embed.value.form?.show_tickets_remaining !== false ? 6 : 9}>
+        <Col md={showStatusBadge ? 6 : 9}>
           <Row className="align-items-start">
             {firstImageUrl && (
               <Col xs="auto" className="pe-20">
@@ -115,6 +119,22 @@ export default function EmbedUpsellingCard({
             </Col>
           </Row>
         </Col>
+        {showAvailability && (
+          <Col md={3} className="text-center">
+            {available > 0 ? (
+              <Badge bg="primary">
+                {available} available
+              </Badge>
+            ) : (
+              <Badge bg="danger">Sold out</Badge>
+            )}
+          </Col>
+        )}
+        {showSoldOutBadge && (
+          <Col md={3} className="text-center">
+            <Badge bg="danger">Sold out</Badge>
+          </Col>
+        )}
         <Col md={3}>
           <Form.Label className="small fw-semibold mb-8">Quantity</Form.Label>
           <UniversalInput

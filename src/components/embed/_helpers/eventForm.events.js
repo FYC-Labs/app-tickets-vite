@@ -194,14 +194,17 @@ export const calculateTotals = () => {
   });
 };
 
-export const handleFieldChange = async (fieldId, value, fieldIdString = null) => {
+export const handleFieldChangeLocal = (fieldId, value, fieldIdString = null) => {
   const formData = { ...$embed.value.formData };
   const key = fieldIdString !== null ? fieldIdString : fieldId;
   formData[key] = value;
   $embed.update({ formData });
   checkFormValidity();
   updateIsPayNowDisabled();
+};
 
+export const handleFieldChange = async (fieldId, value, fieldIdString = null) => {
+  handleFieldChangeLocal(fieldId, value, fieldIdString);
   await createOrUpdateOrderAndInitializePayment();
 };
 
@@ -448,6 +451,17 @@ const isValidUSPhone = (phone) => {
   return digitsOnly.length === 10;
 };
 
+const buildSafeFormResponses = (formData = {}) => {
+  const {
+    card_number: _cardNumber,
+    card_cvc: _cardCvc,
+    card_expiration: _cardExpiration,
+    cardholder_name: _cardholderName,
+    ...safeFormData
+  } = formData;
+  return safeFormData;
+};
+
 export const checkFormValidity = () => {
   const { form, formData, selectedTickets, tickets } = $embed.value;
 
@@ -602,7 +616,7 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
     $embed.update({ isLoadingCCForm: true });
 
     const { form, formData } = $embed.value;
-    const hasMinimalData = formData?.email && formData?.name;
+    const hasMinimalData = formData?.email && formData?.first_name && formData?.last_name;
 
     // If an order exists and is PENDING, try to update it; otherwise create new
     let orderToUse = null;
@@ -628,15 +642,11 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
         }
 
         // Create form_submission if it doesn't exist and we have minimal data
-        // Only include name and email in responses at this point
         let submissionId = $embed.value.order.form_submission_id;
         if (!submissionId && form && hasMinimalData) {
           try {
-            const minimalResponses = {
-              name: formData.name,
-              email: formData.email,
-            };
-            const submission = await formsAPI.submitForm(form.id, minimalResponses, formData.email);
+            const safeFormResponses = buildSafeFormResponses(formData);
+            const submission = await formsAPI.submitForm(form.id, safeFormResponses, formData.email);
             submissionId = submission.id;
           } catch (submissionError) {
             console.error('Error creating form submission:', submissionError);
@@ -648,7 +658,7 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
           $embed.value.order.id,
           orderItems,
           totals.discount_amount,
-          $embed.value.formData.name,
+          `${$embed.value.formData.first_name} ${$embed.value.formData.last_name}`,
           $embed.value.formData.email,
           submissionId, // Pass submissionId if we created one
         );
@@ -707,13 +717,8 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
 
     let submissionId = null;
     if (form && !skipFormSubmission) {
-      // Only include name and email in responses at this point
-      const minimalResponses = {
-        name: formData.name,
-        email: formData.email,
-      };
-
-      const submission = await formsAPI.submitForm(form.id, minimalResponses, formData.email);
+      const safeFormResponses = buildSafeFormResponses(formData);
+      const submission = await formsAPI.submitForm(form.id, safeFormResponses, formData.email);
       submissionId = submission.id;
     }
 
@@ -726,7 +731,9 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
       total: totals.total,
       status: 'PENDING',
       customer_email: formData.email,
-      customer_name: formData.name || null,
+      customer_name: `${formData.first_name} ${formData.last_name}` || null,
+      customer_first_name: formData.first_name || null,
+      customer_last_name: formData.last_name || null,
       items: orderItems,
     };
 
@@ -990,16 +997,36 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null, op
 };
 
 export const updateIsPayNowDisabled = () => {
-  const hasName = $embed.value.formData.name && $embed.value.formData.name.trim() !== '';
+  const hasName = $embed.value.formData.first_name && $embed.value.formData.first_name.trim() !== '' && $embed.value.formData.last_name && $embed.value.formData.last_name.trim() !== '';
   const hasEmail = $embed.value.formData.email && $embed.value.formData.email.trim() !== '';
   const hasTickets = Object.values($embed.value.selectedTickets).some((qty) => qty > 0);
+  // const hasAdditionalHolders = Object.values($embed.value.formData.holder_1_name).some((name) => name.trim() !== '');
   const isCcLoading = $embed.value.isLoadingCCForm;
   $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets || isCcLoading });
 };
 
-export const submitPaymentFormProgrammatically = () => {
+const syncLatestFormDataToSubmission = async () => {
+  const { order, form, formData } = $embed.value;
+  const submissionId = order?.form_submission_id;
+
+  // We only update an existing submission to avoid extra order churn.
+  if (!submissionId || !form?.id) {
+    return;
+  }
+
+  const safeFormData = buildSafeFormResponses(formData);
+  await formsAPI.updateSubmission(submissionId, safeFormData);
+};
+
+export const submitPaymentFormProgrammatically = async () => {
+  try {
+    await syncLatestFormDataToSubmission();
+  } catch (err) {
+    // Best-effort sync: do not block checkout if this update fails.
+  }
+
   if ($embed.value.totals.total <= 0) {
-    handleFreeOrderComplete();
+    await handleFreeOrderComplete();
     return;
   }
   if (paymentSubmitBtnRef.value) {
@@ -1015,7 +1042,7 @@ export const handleClickPayNow = async () => {
       $embed.update({ currentStep: 'upsell' });
       return;
     }
-    submitPaymentFormProgrammatically();
+    await submitPaymentFormProgrammatically();
     return;
   }
 
@@ -1054,12 +1081,12 @@ export const handleClickPayNow = async () => {
   }
 
   if ($embed.value.currentStep === 'upsell') {
-    submitPaymentFormProgrammatically();
+    await submitPaymentFormProgrammatically();
     return;
   }
 
   if ($embed.value.currentStep === 'checkoutWithUpsell') {
-    submitPaymentFormProgrammatically();
+    await submitPaymentFormProgrammatically();
     return;
   }
 

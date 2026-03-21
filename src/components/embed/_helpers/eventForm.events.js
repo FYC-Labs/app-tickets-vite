@@ -654,13 +654,15 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
           }
         }
 
+        const discountCodeId = $embed.value.appliedDiscount?.id || null;
+        const upsellingDiscountAmount = discountCodeId ? 0 : totals.discount_amount;
         orderToUse = await ordersAPI.update(
           $embed.value.order.id,
           orderItems,
-          totals.discount_amount,
+          upsellingDiscountAmount,
+          discountCodeId,
           `${$embed.value.formData.first_name} ${$embed.value.formData.last_name}`,
           $embed.value.formData.email,
-          submissionId, // Pass submissionId if we created one
         );
       } catch (updateError) {
         // If update fails, create a new order

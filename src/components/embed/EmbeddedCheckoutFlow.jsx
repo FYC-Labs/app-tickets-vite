@@ -63,7 +63,10 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
           {$embed.value.currentStep !== 'checkoutWithUpsell' &&
            $embed.value.order &&
            parseFloat($embed.value.totals?.subtotal) > $embed.value.totals?.discount_amount && (
-           <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+           <EmbedPaymentDetails
+             onPaymentSuccess={handlePaymentSuccessCallback}
+             isActive={$embed.value.currentStep !== 'checkoutWithUpsell'}
+           />
           )}
         </div>
         <div className={`d-${$embed.value.currentStep === 'checkoutWithUpsell' ? 'block' : 'none'}`}>
@@ -75,7 +78,10 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 </div>
               )}
               <div className={`d-${$embed.value.totals?.total === 0 ? 'none' : 'block'}`}>
-                <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+                <EmbedPaymentDetails
+                  onPaymentSuccess={handlePaymentSuccessCallback}
+                  isActive={$embed.value.currentStep === 'checkoutWithUpsell'}
+                />
               </div>
             </>
           )}

@@ -371,6 +371,30 @@ function normalizeOrderItemForCustomerIO(item: any) {
   };
 }
 
+function extractAdditionalHolders(formResponses: any) {
+  if (!formResponses || typeof formResponses !== "object") return [];
+
+  const holdersByIndex: Record<string, { name?: string; email?: string }> = {};
+
+  for (const [key, rawValue] of Object.entries(formResponses)) {
+    const match = key.match(/^holder_(\d+)_(name|email)$/);
+    if (!match) continue;
+    const [, index, field] = match;
+    if (!holdersByIndex[index]) holdersByIndex[index] = {};
+    holdersByIndex[index][field as "name" | "email"] =
+      typeof rawValue === "string" ? rawValue.trim() : String(rawValue ?? "");
+  }
+
+  return Object.keys(holdersByIndex)
+    .map((index) => ({ index: Number(index), ...holdersByIndex[index] }))
+    .sort((a, b) => a.index - b.index)
+    .filter((holder) => holder.email)
+    .map(({ name, email }) => ({
+      name: name || "",
+      email: (email || "").trim(),
+    }));
+}
+
 /**
  * Builds trigger data for Customer.io email (includes tickets, upsellings, custom_fields)
  */
@@ -454,6 +478,7 @@ function buildCustomerAttributes(
 
     // Form submission responses
     form_responses: formResponses,
+    responses: formResponses,
   };
 
   // Add custom attribute if configured
@@ -512,6 +537,9 @@ async function sendConfirmationEmail(
     }
 
     const event = eventData.events;
+    const additionalHolders = extractAdditionalHolders(
+      eventData.form_submissions?.responses || null,
+    );
 
     // Send transactional email if configured
     if (
@@ -530,6 +558,37 @@ async function sendConfirmationEmail(
 
       if (!emailResult.success) {
         console.warn("Customer.io email failed:", emailResult.error);
+      }
+
+      // Also send to additional holders
+      const primaryEmail = String(eventData.customer_email || "").toLowerCase();
+      const seenEmails = new Set([primaryEmail]);
+      for (let i = 0; i < additionalHolders.length; i++) {
+        const holder = additionalHolders[i];
+        const holderEmail = String(holder.email || "").toLowerCase().trim();
+        if (!holderEmail || seenEmails.has(holderEmail)) continue;
+        seenEmails.add(holderEmail);
+
+        const holderTriggerData = {
+          ...triggerData,
+          name: holder.name || `Additional Holder ${i + 1}`,
+          email: holderEmail,
+        };
+
+        const holderEmailResult = await sendTransactionalEmail(
+          {
+            appApiKey: event.customerio_app_api_key,
+            transactionalTemplateId: event.customerio_transactional_template_id,
+          },
+          holderTriggerData,
+        );
+
+        if (!holderEmailResult.success) {
+          console.warn(
+            `Customer.io additional holder email failed (${holderEmail}):`,
+            holderEmailResult.error,
+          );
+        }
       }
     } else {
       console.warn(
@@ -568,6 +627,37 @@ async function sendConfirmationEmail(
       if (identifyResult.success) {
       } else {
         console.warn("Customer.io identify failed:", identifyResult.error);
+      }
+
+      // Identify additional holders as separate profiles with same order payload
+      const primaryEmail = String(eventData.customer_email || "").toLowerCase();
+      const seenEmails = new Set([primaryEmail]);
+      for (let i = 0; i < additionalHolders.length; i++) {
+        const holder = additionalHolders[i];
+        const holderEmail = String(holder.email || "").toLowerCase().trim();
+        if (!holderEmail || seenEmails.has(holderEmail)) continue;
+        seenEmails.add(holderEmail);
+
+        const holderAttributes = {
+          ...customerAttributes,
+          name: holder.name || `Additional Holder ${i + 1}`,
+        };
+
+        const holderIdentifyResult = await identifyCustomer(
+          {
+            siteId: event.customerio_site_id,
+            trackApiKey: event.customerio_track_api_key,
+          },
+          holderEmail,
+          holderAttributes,
+        );
+
+        if (!holderIdentifyResult.success) {
+          console.warn(
+            `Customer.io additional holder identify failed (${holderEmail}):`,
+            holderIdentifyResult.error,
+          );
+        }
       }
     } else {
       console.warn("Customer.io Track API not configured for this event");

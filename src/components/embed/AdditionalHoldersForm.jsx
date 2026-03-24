@@ -1,7 +1,7 @@
 import { Form, Row, Col } from 'react-bootstrap';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { $embed } from '@src/signals';
-import { handleFieldChangeLocal } from './_helpers/eventForm.events';
+import { handleAdditionalHolderFieldChange } from './_helpers/eventForm.events';
 
 function AdditionalHoldersForm() {
   const selectedTickets = $embed.value.selectedTickets || {};
@@ -26,7 +26,7 @@ function AdditionalHoldersForm() {
                   name={`holder_${index + 1}_name`}
                   placeholder="Enter full name"
                   value={formData[`holder_${index + 1}_name`] || ''}
-                  customOnChange={(e) => handleFieldChangeLocal(`holder_${index + 1}_name`, e.target.value)}
+                  customOnChange={(e) => handleAdditionalHolderFieldChange(`holder_${index + 1}_name`, e.target.value)}
                   required
                 />
               </Col>
@@ -37,7 +37,7 @@ function AdditionalHoldersForm() {
                   name={`holder_${index + 1}_email`}
                   placeholder="Enter email"
                   value={formData[`holder_${index + 1}_email`] || ''}
-                  customOnChange={(e) => handleFieldChangeLocal(`holder_${index + 1}_email`, e.target.value)}
+                  customOnChange={(e) => handleAdditionalHolderFieldChange(`holder_${index + 1}_email`, e.target.value)}
                   required
                 />
               </Col>

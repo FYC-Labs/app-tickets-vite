@@ -10,7 +10,7 @@ import { handleClickPayNow } from '@src/components/embed/_helpers/eventForm.even
 import EmbedUpsellingsList from '@src/components/embed/_components/EmbedUpsellingsList';
 import EmbedOrderTotals from '@src/components/embed/_components/EmbedOrderTotals';
 import { $upsellTimer, isProcessingPayment } from '@src/components/embed/_helpers/checkout.consts';
-import { handlePaymentSuccess, goToOrderConfirmation, loadFormData, updateIsPayNowDisabled } from './_helpers/eventForm.events';
+import { handlePaymentSuccess, goToOrderConfirmation, loadFormData, updateIsPayNowDisabled, hasCompleteAdditionalHolders } from './_helpers/eventForm.events';
 import Step1Checkout from './_components/Step1Checkout';
 import EmbedPaymentDetails from './_components/EmbedPaymentDetails';
 import DiscountCodeInput from './_components/DiscountCodeInput';
@@ -26,6 +26,8 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
     },
     [confirmationUrlOverride],
   );
+
+  const hasAdditionalHoldersData = hasCompleteAdditionalHolders($embed.value.formData, $embed.value.selectedTickets);
 
   useEffect(() => {
     updateIsPayNowDisabled();
@@ -62,12 +64,16 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
           )}
           {$embed.value.currentStep !== 'checkoutWithUpsell' &&
            $embed.value.order &&
+           hasAdditionalHoldersData &&
            parseFloat($embed.value.totals?.subtotal) > $embed.value.totals?.discount_amount && (
-           <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+           <EmbedPaymentDetails
+             onPaymentSuccess={handlePaymentSuccessCallback}
+             isActive={$embed.value.currentStep !== 'checkoutWithUpsell'}
+           />
           )}
         </div>
         <div className={`d-${$embed.value.currentStep === 'checkoutWithUpsell' ? 'block' : 'none'}`}>
-          {$embed.value.order && (
+          {$embed.value.order && hasAdditionalHoldersData && (
             <>
               {$embed.value.totals?.total === 0 && (
                 <div className="my-16 lead text-center text-dark bg-light-200 rounded-15 p-16">
@@ -75,7 +81,10 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 </div>
               )}
               <div className={`d-${$embed.value.totals?.total === 0 ? 'none' : 'block'}`}>
-                <EmbedPaymentDetails onPaymentSuccess={handlePaymentSuccessCallback} />
+                <EmbedPaymentDetails
+                  onPaymentSuccess={handlePaymentSuccessCallback}
+                  isActive={$embed.value.currentStep === 'checkoutWithUpsell'}
+                />
               </div>
             </>
           )}

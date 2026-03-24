@@ -194,15 +194,38 @@ export const calculateTotals = () => {
   });
 };
 
-export const handleFieldChange = async (fieldId, value, fieldIdString = null) => {
+export const handleFieldChangeLocal = (fieldId, value, fieldIdString = null) => {
   const formData = { ...$embed.value.formData };
   const key = fieldIdString !== null ? fieldIdString : fieldId;
   formData[key] = value;
   $embed.update({ formData });
   checkFormValidity();
   updateIsPayNowDisabled();
+};
 
+export const handleFieldChange = async (fieldId, value, fieldIdString = null) => {
+  handleFieldChangeLocal(fieldId, value, fieldIdString);
   await createOrUpdateOrderAndInitializePayment();
+};
+
+export const handleAdditionalHolderFieldChange = (fieldId, value, fieldIdString = null) => {
+  handleFieldChangeLocal(fieldId, value, fieldIdString);
+
+  if (additionalHoldersDebounceTimer) {
+    clearTimeout(additionalHoldersDebounceTimer);
+  }
+
+  additionalHoldersDebounceTimer = setTimeout(async () => {
+    const { formData, selectedTickets } = $embed.value;
+    const hasName = formData?.first_name && formData?.last_name;
+    const hasEmail = isValidEmail(formData?.email);
+    const hasTickets = Object.values(selectedTickets || {}).some((qty) => qty > 0);
+    const holdersReady = hasCompleteAdditionalHolders(formData, selectedTickets);
+
+    if (hasName && hasEmail && hasTickets && holdersReady) {
+      await createOrUpdateOrderAndInitializePayment();
+    }
+  }, 250);
 };
 
 export const handleTicketChange = async (ticketId, quantity) => {
@@ -288,6 +311,7 @@ const getPerUnitCustomFields = (current, upsellingId, newLength) => {
 
 // Debounce ref for updating order with upsellings
 let updateUpsellingsDebounceTimer = null;
+let additionalHoldersDebounceTimer = null;
 
 const updateOrderWithUpsellings = async () => {
   const {
@@ -448,6 +472,41 @@ const isValidUSPhone = (phone) => {
   return digitsOnly.length === 10;
 };
 
+const isValidEmail = (email) => {
+  if (!email || typeof email !== 'string') return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+};
+
+export const getAdditionalHoldersRequiredCount = (selectedTickets = {}) => {
+  const totalTicketsSelected = Object.values(selectedTickets).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
+  return Math.max(0, totalTicketsSelected - 1);
+};
+
+export const hasCompleteAdditionalHolders = (formData = {}, selectedTickets = {}) => {
+  const requiredCount = getAdditionalHoldersRequiredCount(selectedTickets);
+  if (requiredCount <= 0) return true;
+
+  for (let i = 1; i <= requiredCount; i++) {
+    const holderName = formData[`holder_${i}_name`];
+    const holderEmail = formData[`holder_${i}_email`];
+    if (!holderName || !String(holderName).trim()) return false;
+    if (!isValidEmail(holderEmail)) return false;
+  }
+
+  return true;
+};
+
+const buildSafeFormResponses = (formData = {}) => {
+  const {
+    card_number: _cardNumber,
+    card_cvc: _cardCvc,
+    card_expiration: _cardExpiration,
+    cardholder_name: _cardholderName,
+    ...safeFormData
+  } = formData;
+  return safeFormData;
+};
+
 export const checkFormValidity = () => {
   const { form, formData, selectedTickets, tickets } = $embed.value;
 
@@ -456,8 +515,7 @@ export const checkFormValidity = () => {
     return;
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(formData.email)) {
+  if (!isValidEmail(formData.email)) {
     $embed.update({ isFormValid: false });
     return;
   }
@@ -485,6 +543,11 @@ export const checkFormValidity = () => {
       $embed.update({ isFormValid: false });
       return;
     }
+  }
+
+  if (!hasCompleteAdditionalHolders(formData, selectedTickets)) {
+    $embed.update({ isFormValid: false });
+    return;
   }
 
   $embed.update({ isFormValid: true });
@@ -601,8 +664,12 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
     }
     $embed.update({ isLoadingCCForm: true });
 
-    const { form, formData } = $embed.value;
-    const hasMinimalData = formData?.email && formData?.name;
+    const { form, formData, selectedTickets } = $embed.value;
+    const hasMinimalData = formData?.email && formData?.first_name && formData?.last_name;
+    const hasAdditionalHoldersData = hasCompleteAdditionalHolders(formData, selectedTickets);
+    if (!hasAdditionalHoldersData) {
+      return;
+    }
 
     // If an order exists and is PENDING, try to update it; otherwise create new
     let orderToUse = null;
@@ -628,15 +695,11 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
         }
 
         // Create form_submission if it doesn't exist and we have minimal data
-        // Only include name and email in responses at this point
         let submissionId = $embed.value.order.form_submission_id;
         if (!submissionId && form && hasMinimalData) {
           try {
-            const minimalResponses = {
-              name: formData.name,
-              email: formData.email,
-            };
-            const submission = await formsAPI.submitForm(form.id, minimalResponses, formData.email);
+            const safeFormResponses = buildSafeFormResponses(formData);
+            const submission = await formsAPI.submitForm(form.id, safeFormResponses, formData.email);
             submissionId = submission.id;
           } catch (submissionError) {
             console.error('Error creating form submission:', submissionError);
@@ -644,13 +707,15 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
           }
         }
 
+        const discountCodeId = $embed.value.appliedDiscount?.id || null;
+        const upsellingDiscountAmount = discountCodeId ? 0 : totals.discount_amount;
         orderToUse = await ordersAPI.update(
           $embed.value.order.id,
           orderItems,
-          totals.discount_amount,
-          $embed.value.formData.name,
+          upsellingDiscountAmount,
+          discountCodeId,
+          `${$embed.value.formData.first_name} ${$embed.value.formData.last_name}`,
           $embed.value.formData.email,
-          submissionId, // Pass submissionId if we created one
         );
       } catch (updateError) {
         // If update fails, create a new order
@@ -707,13 +772,8 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
 
     let submissionId = null;
     if (form && !skipFormSubmission) {
-      // Only include name and email in responses at this point
-      const minimalResponses = {
-        name: formData.name,
-        email: formData.email,
-      };
-
-      const submission = await formsAPI.submitForm(form.id, minimalResponses, formData.email);
+      const safeFormResponses = buildSafeFormResponses(formData);
+      const submission = await formsAPI.submitForm(form.id, safeFormResponses, formData.email);
       submissionId = submission.id;
     }
 
@@ -726,7 +786,9 @@ export const createOrderForPayment = async (formId, eventId, skipFormSubmission 
       total: totals.total,
       status: 'PENDING',
       customer_email: formData.email,
-      customer_name: formData.name || null,
+      customer_name: `${formData.first_name} ${formData.last_name}` || null,
+      customer_first_name: formData.first_name || null,
+      customer_last_name: formData.last_name || null,
       items: orderItems,
     };
 
@@ -990,16 +1052,36 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null, op
 };
 
 export const updateIsPayNowDisabled = () => {
-  const hasName = $embed.value.formData.name && $embed.value.formData.name.trim() !== '';
+  const hasName = $embed.value.formData.first_name && $embed.value.formData.first_name.trim() !== '' && $embed.value.formData.last_name && $embed.value.formData.last_name.trim() !== '';
   const hasEmail = $embed.value.formData.email && $embed.value.formData.email.trim() !== '';
   const hasTickets = Object.values($embed.value.selectedTickets).some((qty) => qty > 0);
+  const hasAdditionalHolders = hasCompleteAdditionalHolders($embed.value.formData, $embed.value.selectedTickets);
   const isCcLoading = $embed.value.isLoadingCCForm;
-  $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets || isCcLoading });
+  $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets || !hasAdditionalHolders || isCcLoading });
 };
 
-export const submitPaymentFormProgrammatically = () => {
+const syncLatestFormDataToSubmission = async () => {
+  const { order, form, formData } = $embed.value;
+  const submissionId = order?.form_submission_id;
+
+  // We only update an existing submission to avoid extra order churn.
+  if (!submissionId || !form?.id) {
+    return;
+  }
+
+  const safeFormData = buildSafeFormResponses(formData);
+  await formsAPI.updateSubmission(submissionId, safeFormData);
+};
+
+export const submitPaymentFormProgrammatically = async () => {
+  try {
+    await syncLatestFormDataToSubmission();
+  } catch (err) {
+    // Best-effort sync: do not block checkout if this update fails.
+  }
+
   if ($embed.value.totals.total <= 0) {
-    handleFreeOrderComplete();
+    await handleFreeOrderComplete();
     return;
   }
   if (paymentSubmitBtnRef.value) {
@@ -1015,7 +1097,7 @@ export const handleClickPayNow = async () => {
       $embed.update({ currentStep: 'upsell' });
       return;
     }
-    submitPaymentFormProgrammatically();
+    await submitPaymentFormProgrammatically();
     return;
   }
 
@@ -1054,12 +1136,12 @@ export const handleClickPayNow = async () => {
   }
 
   if ($embed.value.currentStep === 'upsell') {
-    submitPaymentFormProgrammatically();
+    await submitPaymentFormProgrammatically();
     return;
   }
 
   if ($embed.value.currentStep === 'checkoutWithUpsell') {
-    submitPaymentFormProgrammatically();
+    await submitPaymentFormProgrammatically();
     return;
   }
 

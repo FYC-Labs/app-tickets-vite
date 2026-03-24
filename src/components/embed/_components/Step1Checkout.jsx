@@ -1,6 +1,7 @@
 import { Form, Row, Col, Alert } from 'react-bootstrap';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
+import AdditionalHoldersForm from '@src/components/embed/AdditionalHoldersForm';
 import { handleFieldChange } from '../_helpers/eventForm.events';
 import TicketSelection from './TicketSelection';
 
@@ -31,19 +32,31 @@ function Step1Checkout() {
               />
             </Col>
             <Col md={12}>
-              <Form.Label>Full Name *</Form.Label>
+              <Form.Label>First Name *</Form.Label>
               <UniversalInput
                 type="text"
-                name="name"
+                name="first_name"
                 placeholder="Your name"
-                value={$embed.value.formData.name || ''}
-                customOnChange={(e) => handleFieldChange('name', e.target.value)}
+                value={$embed.value.formData.first_name || ''}
+                customOnChange={(e) => handleFieldChange('first_name', e.target.value)}
+                required
+              />
+            </Col>
+            <Col md={12} className="mt-16">
+              <Form.Label>Last Name *</Form.Label>
+              <UniversalInput
+                type="text"
+                name="last_name"
+                placeholder="Your name"
+                value={$embed.value.formData.last_name || ''}
+                customOnChange={(e) => handleFieldChange('last_name', e.target.value)}
                 required
               />
             </Col>
           </Row>
         </Form.Group>
         <TicketSelection />
+        <AdditionalHoldersForm />
       </Form>
     </>
   );

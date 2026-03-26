@@ -181,3 +181,15 @@ th, td {
   background: $dark !important;
   color: $white !important;
 }
+.card.scale-up {
+  .card-body {
+    background: $scale-up-bg !important;
+    color: $white !important;
+  }
+  input {
+    background: $scale-up-bg !important;
+    color: $white !important;
+  }
+  background: $scale-up-bg !important;
+  color: $white !important;
+}

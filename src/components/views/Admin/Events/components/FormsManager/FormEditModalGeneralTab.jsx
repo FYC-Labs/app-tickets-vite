@@ -100,6 +100,7 @@ function FormEditModalGeneralTab() {
           >
             <option value="light">Light</option>
             <option value="dark">Dark</option>
+            <option value="scale-up">Scale Up</option>
             <option value="transparent">Transparent</option>
           </UniversalInput>
           <Form.Text className="text-muted">

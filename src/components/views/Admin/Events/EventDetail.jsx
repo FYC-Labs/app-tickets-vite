@@ -47,6 +47,8 @@ function EventDetail() {
   const formLoading = $eventForm.value.isLoading;
   const [copiedApiKey, setCopiedApiKey] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
+  const [copiedCurlUpsell, setCopiedCurlUpsell] = useState(false);
+  const [copiedCurlTicket, setCopiedCurlTicket] = useState(false);
 
   useEffectAsync(async () => {
     await loadEventData(id);
@@ -558,11 +560,121 @@ const data = await res.json();`}
                   </div>
 
                   <div className="alert alert-info mt-24 mb-0">
-                    <strong>Note:</strong> This is a truly public endpoint that
-                    requires no authentication other than the X-API-Key header.
-                    The API key restricts access to only orders for this event.
-                    You can safely call this from client-side or server-side
-                    code.
+                    <strong>Note:</strong> Include both headers. The Supabase gateway requires{' '}
+                    <code>Authorization: Bearer &lt;anon_key&gt;</code>; X-API-Key restricts access to
+                    this event&apos;s data.
+                  </div>
+
+                  <hr className="my-32" />
+
+                  <h5 className="mb-24">Public Upsell Purchasers API</h5>
+                  <p className="text-muted mb-24">
+                    Check if a user has purchased tickets and a specific upsell. Pass{' '}
+                    <code>upselling_id</code> and <code>email</code>; returns{' '}
+                    <code>{'{ "purchased": true }'}</code> or <code>{'{ "purchased": false }'}</code>.
+                  </p>
+
+                  <h6 className="mb-16">API Endpoint</h6>
+                  <div className="bg-light p-3 mb-24 rounded">
+                    <code className="text-dark">
+                      GET {import.meta.env.VITE_SUPABASE_URL}
+                      /functions/v1/public-upsell-purchasers?upselling_id=UPSELLING_ID&email=EMAIL
+                    </code>
+                  </div>
+
+                  <h6 className="mb-16">Example cURL Request</h6>
+                  <div className="bg-dark p-3 mb-16 rounded position-relative">
+                    <Button
+                      variant="outline-light"
+                      size="sm"
+                      className="position-absolute top-0 end-0 m-2"
+                      onClick={() => copyToClipboard(
+                        `curl -X GET "${
+                          import.meta.env.VITE_SUPABASE_URL
+                        }/functions/v1/public-upsell-purchasers?upselling_id=YOUR_UPSELLING_ID&email=user@example.com" \\\n  -H "Authorization: Bearer YOUR_SUPABASE_ANON_KEY" \\\n  -H "X-API-Key: ${
+                          event.api_key || 'YOUR_EVENT_API_KEY'
+                        }"`,
+                        setCopiedCurlUpsell,
+                      )}
+                    >
+                      <FontAwesomeIcon icon={copiedCurlUpsell ? faCheck : faCopy} />
+                    </Button>
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      {`curl -X GET "${
+                        import.meta.env.VITE_SUPABASE_URL
+                      }/functions/v1/public-upsell-purchasers?upselling_id=YOUR_UPSELLING_ID&email=user@example.com" \\
+  -H "Authorization: Bearer YOUR_SUPABASE_ANON_KEY" \\
+  -H "X-API-Key: ${event.api_key || 'YOUR_EVENT_API_KEY'}"`}
+                    </pre>
+                  </div>
+
+                  <h6 className="mb-16">Response</h6>
+                  <div className="bg-dark p-3 rounded mb-24">
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      {'{ "purchased": true }'}
+                    </pre>
+                  </div>
+
+                  <hr className="my-32" />
+
+                  <h5 className="mb-24">Public Ticket Purchasers API</h5>
+                  <p className="text-muted mb-24">
+                    Check if a user has purchased a specific ticket type. Pass{' '}
+                    <code>ticket_type_id</code> and <code>email</code>; returns{' '}
+                    <code>{'{ "purchased": true }'}</code> or <code>{'{ "purchased": false }'}</code>.
+                  </p>
+
+                  <h6 className="mb-16">API Endpoint</h6>
+                  <div className="bg-light p-3 mb-24 rounded">
+                    <code className="text-dark">
+                      GET {import.meta.env.VITE_SUPABASE_URL}
+                      /functions/v1/public-ticket-purchasers?ticket_type_id=TICKET_TYPE_ID&email=EMAIL
+                    </code>
+                  </div>
+
+                  <h6 className="mb-16">Example cURL Request</h6>
+                  <div className="bg-dark p-3 mb-16 rounded position-relative">
+                    <Button
+                      variant="outline-light"
+                      size="sm"
+                      className="position-absolute top-0 end-0 m-2"
+                      onClick={() => copyToClipboard(
+                        `curl -X GET "${
+                          import.meta.env.VITE_SUPABASE_URL
+                        }/functions/v1/public-ticket-purchasers?ticket_type_id=YOUR_TICKET_TYPE_ID&email=user@example.com" \\\n  -H "Authorization: Bearer YOUR_SUPABASE_ANON_KEY" \\\n  -H "X-API-Key: ${
+                          event.api_key || 'YOUR_EVENT_API_KEY'
+                        }"`,
+                        setCopiedCurlTicket,
+                      )}
+                    >
+                      <FontAwesomeIcon icon={copiedCurlTicket ? faCheck : faCopy} />
+                    </Button>
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      {`curl -X GET "${
+                        import.meta.env.VITE_SUPABASE_URL
+                      }/functions/v1/public-ticket-purchasers?ticket_type_id=YOUR_TICKET_TYPE_ID&email=user@example.com" \\
+  -H "Authorization: Bearer YOUR_SUPABASE_ANON_KEY" \\
+  -H "X-API-Key: ${event.api_key || 'YOUR_EVENT_API_KEY'}"`}
+                    </pre>
+                  </div>
+
+                  <h6 className="mb-16">Response</h6>
+                  <div className="bg-dark p-3 rounded">
+                    <pre
+                      className="text-light mb-0"
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      {'{ "purchased": true }'}
+                    </pre>
                   </div>
                 </Card.Body>
               </Card>

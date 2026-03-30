@@ -5,7 +5,20 @@ import AdditionalHoldersForm from '@src/components/embed/AdditionalHoldersForm';
 import { handleFieldChange } from '../_helpers/eventForm.events';
 import TicketSelection from './TicketSelection';
 
-function Step1Checkout() {
+function Step1Checkout({ theme = 'light' }) {
+  const getThemeBgClass = () => {
+    switch (theme) {
+      case 'dark':
+        return 'bg-grey-800';
+      case 'scale-up':
+        return 'bg-primary-900';
+      case 'transparent':
+        return 'bg-transparent';
+      default:
+        return 'bg-light-200';
+    }
+  };
+
   return (
     <>
       {$embed.value.form && (
@@ -17,7 +30,7 @@ function Step1Checkout() {
 
       {$embed.value.error && <Alert variant="danger">{$embed.value.error}</Alert>}
 
-      <Form className="bg-light-200 rounded-15 p-16 mb-16">
+      <Form className={`${getThemeBgClass()} rounded-15 p-16 mb-16`}>
         <Form.Group className="mb-24">
           <Row>
             <Col md={12} className="mb-16">

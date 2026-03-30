@@ -22,6 +22,19 @@ function Checkout() {
   const { isLoading } = $checkout.value;
   const theme = $checkout.value.form?.theme || 'light';
 
+  const getThemeBgClass = () => {
+    switch (theme) {
+      case 'dark':
+        return 'bg-grey-800';
+      case 'scale-up':
+        return 'bg-primary-900';
+      case 'transparent':
+        return 'bg-transparent';
+      default:
+        return 'bg-light-200';
+    }
+  };
+
   // Format preSessionData from payment session into providers format
   const providers = paymentSession?.preSessionData ? [{
     name: PAYMENT_PROCESSOR,
@@ -142,7 +155,7 @@ function Checkout() {
 
           {/* Show payment form when everything is ready and no critical errors */}
           {order && parseFloat(order.total) > 0 && providers && paymentSession && !paymentStatus && !sessionInitError.value && (
-            <Card>
+            <Card className={`${getThemeBgClass()} border-0`}>
               <Card.Body>
                 <Row>
                   <Col md={4}>

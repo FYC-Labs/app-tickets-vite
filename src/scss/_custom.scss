@@ -48,6 +48,21 @@
     border-radius: 5px !important;
   }
 }
+.scale-up {
+  background: $scale-up-bg;
+  color: $white;
+  .card {
+    background: $scale-up-bg;
+    color: $white;
+    border: none;
+  }
+  input:not([type='checkbox']):not([type='radio']), textarea, select {
+    background: $scale-up-bg !important;
+    color: $white !important;
+    border: 1px solid $grey-800 !important;
+    border-radius: 5px !important;
+  }
+}
 .transparent {
   background: transparent;
   color: inherit;

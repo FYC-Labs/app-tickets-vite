@@ -63,13 +63,14 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
             />
           )}
           {$embed.value.currentStep !== 'checkoutWithUpsell' &&
-           $embed.value.order &&
-           hasAdditionalHoldersData &&
-           parseFloat($embed.value.totals?.subtotal) > $embed.value.totals?.discount_amount && (
-           <EmbedPaymentDetails
-             onPaymentSuccess={handlePaymentSuccessCallback}
-             isActive={$embed.value.currentStep !== 'checkoutWithUpsell'}
-           />
+            $embed.value.order &&
+            hasAdditionalHoldersData &&
+            parseFloat($embed.value.totals?.subtotal) > $embed.value.totals?.discount_amount && (
+            <EmbedPaymentDetails
+              onPaymentSuccess={handlePaymentSuccessCallback}
+              isActive={$embed.value.currentStep !== 'checkoutWithUpsell'}
+              theme={theme}
+            />
           )}
         </div>
         <div className={`d-${$embed.value.currentStep === 'checkoutWithUpsell' ? 'block' : 'none'}`}>
@@ -84,6 +85,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 <EmbedPaymentDetails
                   onPaymentSuccess={handlePaymentSuccessCallback}
                   isActive={$embed.value.currentStep === 'checkoutWithUpsell'}
+                  theme={theme}
                 />
               </div>
             </>
@@ -102,7 +104,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
               />
             )}
             <Button
-              variant="dark"
+              variant={theme === 'scale-up' ? 'success' : 'dark'}
               size="lg"
               className="w-100 mt-24"
               onClick={handleClickPayNow}

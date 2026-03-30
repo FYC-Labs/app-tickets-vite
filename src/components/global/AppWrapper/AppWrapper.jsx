@@ -13,11 +13,13 @@ import {
 } from '@src/utils/userback';
 import useWindowSize from '@src/utils/windowSize';
 import { Badge, Container } from 'react-bootstrap';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Loadable from '../Loadable';
 
 const AppWrapper = () => {
   const { breakPoint } = useWindowSize();
+  const { pathname } = useLocation();
+  const isEmbedRoute = pathname.startsWith('/embed/');
 
   useEffectAsync(async () => {
     // Initialize Userback on mount
@@ -57,9 +59,11 @@ const AppWrapper = () => {
           {breakPoint}
         </Badge>
       )}
-      <Loadable signal={$global}>
-        <Outlet />
-      </Loadable>
+      <div className={isEmbedRoute ? 'scale-up min-vh-100' : ''}>
+        <Loadable signal={$global}>
+          <Outlet />
+        </Loadable>
+      </div>
     </Container>
   );
 };

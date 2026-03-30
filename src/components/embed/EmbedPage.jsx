@@ -7,15 +7,22 @@ function EmbedPage() {
   const { formId } = useParams();
   // const [searchParams] = useSearchParams();
   const { form } = $embed.value;
+  const theme = form?.theme || 'light';
+  let pageBgClass = 'light';
+  if (!form || theme === 'scale-up') {
+    pageBgClass = 'scale-up';
+  }
   // const confirmationUrlOverride = searchParams.get('confirmationUrl');
 
   return (
-    <Container className="py-5" style={{ maxWidth: '800px' }}>
-      <EventForm
-        formId={formId}
-        theme={form?.theme || 'light'}
-      />
-    </Container>
+    <div className={`${pageBgClass} min-vh-100`}>
+      <Container className="py-5" style={{ maxWidth: '800px' }}>
+        <EventForm
+          formId={formId}
+          theme={theme}
+        />
+      </Container>
+    </div>
   );
 }
 

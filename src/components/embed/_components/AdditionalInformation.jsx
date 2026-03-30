@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-no-useless-fragment */
 import { $embed } from '@src/signals';
 import { Form } from 'react-bootstrap';
 import FormDynamicField from '@src/components/embed/_components/FormDynamicField';

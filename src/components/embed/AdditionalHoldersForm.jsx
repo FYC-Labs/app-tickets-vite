@@ -1,7 +1,8 @@
+/* eslint-disable arrow-body-style */
 import { Form, Row, Col } from 'react-bootstrap';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { $embed } from '@src/signals';
-import { handleAdditionalHolderFieldChange } from './_helpers/eventForm.events';
+import { handleAdditionalHolderFieldChange, getEmbedPageBgClass } from './_helpers/eventForm.events';
 
 function AdditionalHoldersForm() {
   const selectedTickets = $embed.value.selectedTickets || {};
@@ -14,7 +15,7 @@ function AdditionalHoldersForm() {
   }
 
   return (
-    <Form className="bg-light-200 rounded-15 p-16 mb-16">
+    <Form className={`${getEmbedPageBgClass()} rounded-15 p-16 mb-16`}>
       <Form.Group className="mb-24">
         <Row>
           {Array.from({ length: additionalHoldersCount }).map((_, index) => (

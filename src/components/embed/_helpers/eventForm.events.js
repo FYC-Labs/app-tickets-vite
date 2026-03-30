@@ -9,6 +9,17 @@ import paymentsAPI from '@src/api/payments.api';
 import { initializePaymentSession, fetchPaymentSession } from '@src/components/embed/_helpers/checkout.resolvers';
 import { paymentSubmitBtnRef } from '@src/components/embed/_helpers/checkout.consts';
 
+export const getEmbedPageBgClass = () => {
+  const { form } = $embed.value;
+  if (!form) {
+    return 'bg-light-200';
+  }
+  if (form.theme === 'scale-up') {
+    return 'bg-primary-900';
+  }
+  return 'bg-light-200';
+};
+
 export const loadFormData = async (formId, eventId) => {
   try {
     $embed.loadingStart();

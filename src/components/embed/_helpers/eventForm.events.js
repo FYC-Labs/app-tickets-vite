@@ -228,12 +228,11 @@ export const handleAdditionalHolderFieldChange = (fieldId, value, fieldIdString 
 
   additionalHoldersDebounceTimer = setTimeout(async () => {
     const { formData, selectedTickets } = $embed.value;
-    const hasName = formData?.first_name && formData?.last_name;
-    const hasEmail = isValidEmail(formData?.email);
+    const hasPrimaryBuyerData = hasPrimaryBuyerDataForOrderInit(formData);
     const hasTickets = Object.values(selectedTickets || {}).some((qty) => qty > 0);
     const holdersReady = hasCompleteAdditionalHolders(formData, selectedTickets);
 
-    if (hasName && hasEmail && hasTickets && holdersReady) {
+    if (hasPrimaryBuyerData && hasTickets && holdersReady && primaryBuyerFocusedFields.size === 0) {
       await createOrUpdateOrderAndInitializePayment();
     }
   }, 250);
@@ -246,6 +245,26 @@ export const handleTicketChange = async (ticketId, quantity) => {
   calculateTotals();
   checkFormValidity();
   updateIsPayNowDisabled();
+
+  await createOrUpdateOrderAndInitializePayment();
+};
+
+export const handleScaleUpTicketChange = async (ticketId, quantity, options = {}) => {
+  const { skipOrderSync = false } = options;
+  const nextSelectedTickets = {};
+  ($embed.value.tickets || []).forEach((ticket) => {
+    nextSelectedTickets[ticket.id] = 0;
+  });
+
+  const normalizedQty = Math.min(1, Math.max(0, parseInt(quantity, 10) || 0));
+  nextSelectedTickets[ticketId] = normalizedQty;
+
+  $embed.update({ selectedTickets: nextSelectedTickets });
+  calculateTotals();
+  checkFormValidity();
+  updateIsPayNowDisabled();
+
+  if (skipOrderSync) return;
 
   await createOrUpdateOrderAndInitializePayment();
 };
@@ -288,8 +307,10 @@ export const handleApplyDiscount = async (formId, eventId) => {
               orderItems,
               totals.discount_amount,
               $embed.value.appliedDiscount?.id,
-              formData.name,
+              `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || null,
               formData.email,
+              formData.first_name || null,
+              formData.last_name || null,
             );
             $embed.update({ order: updatedOrder });
           } catch (updateErr) {
@@ -323,6 +344,10 @@ const getPerUnitCustomFields = (current, upsellingId, newLength) => {
 // Debounce ref for updating order with upsellings
 let updateUpsellingsDebounceTimer = null;
 let additionalHoldersDebounceTimer = null;
+let isCreateOrUpdateInFlight = false;
+let shouldRunCreateOrUpdateAgain = false;
+let primaryBuyerBlurTimer = null;
+const primaryBuyerFocusedFields = new Set();
 
 const updateOrderWithUpsellings = async () => {
   const {
@@ -486,6 +511,38 @@ const isValidUSPhone = (phone) => {
 const isValidEmail = (email) => {
   if (!email || typeof email !== 'string') return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+};
+
+const hasTextValue = (value) => typeof value === 'string' && value.trim() !== '';
+
+const hasPrimaryBuyerDataForOrderInit = (formData = {}) => hasTextValue(formData?.first_name)
+  && hasTextValue(formData?.last_name)
+  && isValidEmail(formData?.email);
+
+const canSyncOrderForPrimaryBuyer = () => hasPrimaryBuyerDataForOrderInit($embed.value.formData)
+  && primaryBuyerFocusedFields.size === 0;
+
+export const handlePrimaryBuyerFieldFocus = (fieldId) => {
+  if (!fieldId) return;
+  if (primaryBuyerBlurTimer) {
+    clearTimeout(primaryBuyerBlurTimer);
+    primaryBuyerBlurTimer = null;
+  }
+  primaryBuyerFocusedFields.add(fieldId);
+  updateIsPayNowDisabled();
+};
+
+export const handlePrimaryBuyerFieldBlur = (fieldId) => {
+  if (!fieldId) return;
+  primaryBuyerFocusedFields.delete(fieldId);
+
+  // Wait one tick so focus transitions between fields don't trigger sync.
+  primaryBuyerBlurTimer = setTimeout(async () => {
+    updateIsPayNowDisabled();
+    if (canSyncOrderForPrimaryBuyer()) {
+      await createOrUpdateOrderAndInitializePayment();
+    }
+  }, 0);
 };
 
 export const getAdditionalHoldersRequiredCount = (selectedTickets = {}) => {
@@ -665,6 +722,12 @@ export const handleSubmit = async (e, formId, eventId, onSubmitSuccess) => {
  * - Name or email is entered/changed
  */
 export const createOrUpdateOrderAndInitializePayment = async () => {
+  if (isCreateOrUpdateInFlight) {
+    shouldRunCreateOrUpdateAgain = true;
+    return;
+  }
+
+  isCreateOrUpdateInFlight = true;
   try {
     if ($embed.value.isPayNowDisabled) {
       return;
@@ -676,9 +739,9 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
     $embed.update({ isLoadingCCForm: true });
 
     const { form, formData, selectedTickets } = $embed.value;
-    const hasMinimalData = formData?.email && formData?.first_name && formData?.last_name;
+    const hasMinimalData = hasPrimaryBuyerDataForOrderInit(formData);
     const hasAdditionalHoldersData = hasCompleteAdditionalHolders(formData, selectedTickets);
-    if (!hasAdditionalHoldersData) {
+    if (!hasAdditionalHoldersData || primaryBuyerFocusedFields.size > 0 || !hasMinimalData) {
       return;
     }
 
@@ -727,6 +790,8 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
           discountCodeId,
           `${$embed.value.formData.first_name} ${$embed.value.formData.last_name}`,
           $embed.value.formData.email,
+          $embed.value.formData.first_name || null,
+          $embed.value.formData.last_name || null,
         );
       } catch (updateError) {
         // If update fails, create a new order
@@ -757,7 +822,13 @@ export const createOrUpdateOrderAndInitializePayment = async () => {
   } catch (err) {
     console.error('Error creating or updating order and initializing payment:', err);
   } finally {
+    isCreateOrUpdateInFlight = false;
     $embed.update({ isLoadingCCForm: false });
+
+    if (shouldRunCreateOrUpdateAgain) {
+      shouldRunCreateOrUpdateAgain = false;
+      await createOrUpdateOrderAndInitializePayment();
+    }
   }
 };
 
@@ -1063,12 +1134,17 @@ export const handleFreeOrderComplete = async (confirmationUrlOverride = null, op
 };
 
 export const updateIsPayNowDisabled = () => {
-  const hasName = $embed.value.formData.first_name && $embed.value.formData.first_name.trim() !== '' && $embed.value.formData.last_name && $embed.value.formData.last_name.trim() !== '';
-  const hasEmail = $embed.value.formData.email && $embed.value.formData.email.trim() !== '';
+  const hasPrimaryBuyerData = hasPrimaryBuyerDataForOrderInit($embed.value.formData);
   const hasTickets = Object.values($embed.value.selectedTickets).some((qty) => qty > 0);
   const hasAdditionalHolders = hasCompleteAdditionalHolders($embed.value.formData, $embed.value.selectedTickets);
   const isCcLoading = $embed.value.isLoadingCCForm;
-  $embed.update({ isPayNowDisabled: !hasName || !hasEmail || !hasTickets || !hasAdditionalHolders || isCcLoading });
+  $embed.update({
+    isPayNowDisabled: !hasPrimaryBuyerData
+      || !hasTickets
+      || !hasAdditionalHolders
+      || isCcLoading
+      || primaryBuyerFocusedFields.size > 0,
+  });
 };
 
 const syncLatestFormDataToSubmission = async () => {

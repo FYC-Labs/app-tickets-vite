@@ -1,11 +1,31 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Form, Row, Col, Badge } from 'react-bootstrap';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
-import { handleTicketChange } from '@src/components/embed/_helpers/eventForm.events';
+import { handleTicketChange, handleScaleUpTicketChange } from '@src/components/embed/_helpers/eventForm.events';
 
-export default function TicketSelection() {
+export default function TicketSelection({ theme }) {
   const { form, tickets, selectedTickets } = $embed.value;
+  const isScaleUpTheme = theme === 'scale-up';
+  const hasAutoSelectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!tickets || tickets.length === 0) return;
+    if (!isScaleUpTheme) return;
+    if (hasAutoSelectedRef.current) return;
+
+    const hasSelection = Object.values(selectedTickets || {}).some((qty) => Number(qty) > 0);
+    if (hasSelection) {
+      hasAutoSelectedRef.current = true;
+      return;
+    }
+
+    const firstAvailableTicket = tickets.find((ticket) => (ticket.quantity - (ticket.sold || 0)) > 0);
+    if (firstAvailableTicket) {
+      hasAutoSelectedRef.current = true;
+      handleScaleUpTicketChange(firstAvailableTicket.id, 1, { skipOrderSync: true });
+    }
+  }, [isScaleUpTheme, tickets, selectedTickets]);
 
   if (!tickets || tickets.length === 0) {
     return null;
@@ -63,11 +83,15 @@ export default function TicketSelection() {
                 name={`ticket_${ticket.id}`}
                 value={selectedQty}
                 customOnChange={e => {
+                  if (isScaleUpTheme) {
+                    handleScaleUpTicketChange(ticket.id, Number(e.target.value));
+                    return;
+                  }
                   handleTicketChange(ticket.id, Number(e.target.value));
                 }}
-                disabled={available === 0}
+                disabled={available === 0 || isScaleUpTheme}
               >
-                {[...Array(available + 1).keys()].map(n => (
+                {(isScaleUpTheme ? [0, 1].filter((n) => n <= available) : [...Array(available + 1).keys()]).map(n => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </UniversalInput>

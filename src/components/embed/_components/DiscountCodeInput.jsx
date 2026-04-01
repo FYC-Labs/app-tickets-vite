@@ -4,7 +4,7 @@ import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { $embed } from '@src/signals';
 import { handleApplyDiscount, updateDiscountCode } from '@src/components/embed/_helpers/eventForm.events';
 
-function DiscountCodeInput({ formId, eventId, className = '' }) {
+function DiscountCodeInput({ formId, eventId, className = '', theme = 'light' }) {
   const shouldShowDiscountCode = $embed.value.form?.show_discount_code !== false;
 
   if (!shouldShowDiscountCode) {
@@ -28,8 +28,15 @@ function DiscountCodeInput({ formId, eventId, className = '' }) {
           variant="dark"
           onClick={() => handleApplyDiscount(formId, eventId)}
           style={{ whiteSpace: 'nowrap' }}
+          className={theme === 'scale-up' ? 'btn-sheer scale-up gradient-register text-decoration-none' : ''}
         >
-          Apply
+          {theme === 'scale-up' ? (
+            <span className="btn-sheer-inner">
+              Apply
+            </span>
+          ) : (
+            'Apply'
+          )}
         </Button>
       </div>
       {$embed.value.appliedDiscount && (

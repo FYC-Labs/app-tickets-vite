@@ -2,7 +2,11 @@ import { Form, Row, Col, Alert } from 'react-bootstrap';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import AdditionalHoldersForm from '@src/components/embed/AdditionalHoldersForm';
-import { handleFieldChange } from '../_helpers/eventForm.events';
+import {
+  handleFieldChange,
+  handlePrimaryBuyerFieldFocus,
+  handlePrimaryBuyerFieldBlur,
+} from '../_helpers/eventForm.events';
 import TicketSelection from './TicketSelection';
 
 function Step1Checkout({ theme = 'light' }) {
@@ -41,6 +45,8 @@ function Step1Checkout({ theme = 'light' }) {
                 placeholder="your@email.com"
                 value={$embed.value.formData.email || ''}
                 customOnChange={(e) => handleFieldChange('email', e.target.value)}
+                onFocus={() => handlePrimaryBuyerFieldFocus('email')}
+                onBlur={() => handlePrimaryBuyerFieldBlur('email')}
                 required
               />
             </Col>
@@ -52,6 +58,8 @@ function Step1Checkout({ theme = 'light' }) {
                 placeholder="Your name"
                 value={$embed.value.formData.first_name || ''}
                 customOnChange={(e) => handleFieldChange('first_name', e.target.value)}
+                onFocus={() => handlePrimaryBuyerFieldFocus('first_name')}
+                onBlur={() => handlePrimaryBuyerFieldBlur('first_name')}
                 required
               />
             </Col>
@@ -63,12 +71,14 @@ function Step1Checkout({ theme = 'light' }) {
                 placeholder="Your name"
                 value={$embed.value.formData.last_name || ''}
                 customOnChange={(e) => handleFieldChange('last_name', e.target.value)}
+                onFocus={() => handlePrimaryBuyerFieldFocus('last_name')}
+                onBlur={() => handlePrimaryBuyerFieldBlur('last_name')}
                 required
               />
             </Col>
           </Row>
         </Form.Group>
-        <TicketSelection />
+        <TicketSelection theme={theme} />
         <AdditionalHoldersForm />
       </Form>
     </>

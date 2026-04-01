@@ -18,6 +18,7 @@ import DiscountCodeInput from './_components/DiscountCodeInput';
 function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
   const [searchParams] = useSearchParams();
   const confirmationUrlOverride = searchParams.get('confirmationUrl');
+  const ctaLabel = $embed.value.currentStep === 'initial' ? 'Place Order' : 'Complete Checkout';
 
   const handlePaymentSuccessCallback = useCallback(
     async (paymentData) => {
@@ -101,21 +102,28 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
                 formId={formId}
                 eventId={eventId}
                 className="mt-24"
+                theme={theme}
               />
             )}
             <Button
-              variant={theme === 'scale-up' ? 'success' : 'dark'}
+              variant="dark"
               size="lg"
-              className="w-100 mt-24"
+              className={`w-100 mt-24 ${theme === 'scale-up' ? 'btn-sheer scale-up gradient-register text-decoration-none' : ''}`}
               onClick={handleClickPayNow}
               disabled={$embed.value.isPayNowDisabled}
             >
-              {$embed.value.currentStep === 'initial' ? 'Place Order' : 'Complete Checkout'}
+              {theme === 'scale-up' ? (
+                <span className="btn-sheer-inner">
+                  {ctaLabel}
+                </span>
+              ) : (
+                ctaLabel
+              )}
             </Button>
             {$embed.value.currentStep === 'upsell' && !$embed.value.isCountDownTimerDisabled && (
               <div className="text-muted text-center mt-8">Auto-completes in {$upsellTimer.value} seconds</div>
             )}
-            <EmbedOrderTotals />
+            <EmbedOrderTotals theme={theme} />
           </>
         )}
       </Card.Body>

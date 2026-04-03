@@ -547,7 +547,15 @@ export const handlePrimaryBuyerFieldBlur = (fieldId) => {
 
 export const getAdditionalHoldersRequiredCount = (selectedTickets = {}) => {
   const totalTicketsSelected = Object.values(selectedTickets).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-  return Math.max(0, totalTicketsSelected - 1);
+  const holdersAfterFirstTicket = Math.max(0, totalTicketsSelected - 1);
+  const mandatoryAdditionalHolders = Boolean($embed.value.form?.mandatory_additional_holders);
+
+  if (mandatoryAdditionalHolders) {
+    // e.g. 2-for-1: a single additional holder block while the promo flag is on
+    return totalTicketsSelected >= 1 ? 1 : 0;
+  }
+
+  return holdersAfterFirstTicket;
 };
 
 export const hasCompleteAdditionalHolders = (formData = {}, selectedTickets = {}) => {

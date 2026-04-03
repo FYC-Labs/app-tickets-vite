@@ -2,17 +2,29 @@
 import { Form, Row, Col } from 'react-bootstrap';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { $embed } from '@src/signals';
-import { handleAdditionalHolderFieldChange, getEmbedPageBgClass } from './_helpers/eventForm.events';
+import { handleAdditionalHolderFieldChange, getEmbedPageBgClass, getAdditionalHoldersRequiredCount } from '../_helpers/eventForm.events';
 
 function AdditionalHoldersForm() {
   const selectedTickets = $embed.value.selectedTickets || {};
   const formData = $embed.value.formData || {};
-  const totalTicketsSelected = Object.values(selectedTickets).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-  const additionalHoldersCount = Math.max(0, totalTicketsSelected - 1);
+  const additionalHoldersCount = getAdditionalHoldersRequiredCount(selectedTickets);
 
   if (additionalHoldersCount <= 0) {
     return null;
   }
+
+  const attendeeLabel = {
+    0: 'Primary Holder',
+    1: 'Second Attendee Information',
+    2: 'Third Attendee Information',
+    3: 'Fourth Attendee Information',
+    4: 'Fifth Attendee Information',
+    5: 'Sixth Attendee Information',
+    6: 'Seventh Attendee Information',
+    7: 'Eighth Attendee Information',
+    8: 'Ninth Attendee Information',
+    9: 'Tenth Attendee Information',
+  };
 
   return (
     <Form className={`${getEmbedPageBgClass()} rounded-15 p-16 mb-16`}>
@@ -21,7 +33,7 @@ function AdditionalHoldersForm() {
           {Array.from({ length: additionalHoldersCount }).map((_, index) => (
             <Row key={`holder-${index}`} className="g-0">
               <Col md={12} className="mb-16">
-                <Form.Label>Additional Holder {index + 1}</Form.Label>
+                <Form.Label>{attendeeLabel[index + 1]}</Form.Label>
                 <UniversalInput
                   type="text"
                   name={`holder_${index + 1}_name`}

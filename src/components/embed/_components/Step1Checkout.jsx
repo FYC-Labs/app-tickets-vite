@@ -1,7 +1,7 @@
 import { Form, Row, Col, Alert } from 'react-bootstrap';
 import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
-import AdditionalHoldersForm from '@src/components/embed/AdditionalHoldersForm';
+import AdditionalHoldersForm from './AdditionalHoldersForm';
 import {
   handleFieldChange,
   handlePrimaryBuyerFieldFocus,
@@ -78,7 +78,7 @@ function Step1Checkout({ theme = 'light' }) {
             </Col>
           </Row>
         </Form.Group>
-        <TicketSelection theme={theme} />
+        <TicketSelection />
         <AdditionalHoldersForm />
       </Form>
     </>

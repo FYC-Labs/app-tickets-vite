@@ -4,14 +4,13 @@ import { $embed } from '@src/signals';
 import UniversalInput from '@src/components/global/Inputs/UniversalInput';
 import { handleTicketChange, handleScaleUpTicketChange } from '@src/components/embed/_helpers/eventForm.events';
 
-export default function TicketSelection({ theme }) {
+export default function TicketSelection() {
   const { form, tickets, selectedTickets } = $embed.value;
-  const isScaleUpTheme = theme === 'scale-up';
   const hasAutoSelectedRef = useRef(false);
 
   useEffect(() => {
     if (!tickets || tickets.length === 0) return;
-    if (!isScaleUpTheme) return;
+    if (!$embed.value.form?.solo_ticket) return;
     if (hasAutoSelectedRef.current) return;
 
     const hasSelection = Object.values(selectedTickets || {}).some((qty) => Number(qty) > 0);
@@ -25,7 +24,7 @@ export default function TicketSelection({ theme }) {
       hasAutoSelectedRef.current = true;
       handleScaleUpTicketChange(firstAvailableTicket.id, 1, { skipOrderSync: true });
     }
-  }, [isScaleUpTheme, tickets, selectedTickets]);
+  }, [tickets, selectedTickets]);
 
   if (!tickets || tickets.length === 0) {
     return null;
@@ -83,15 +82,15 @@ export default function TicketSelection({ theme }) {
                 name={`ticket_${ticket.id}`}
                 value={selectedQty}
                 customOnChange={e => {
-                  if (isScaleUpTheme) {
+                  if ($embed.value.form?.solo_ticket) {
                     handleScaleUpTicketChange(ticket.id, Number(e.target.value));
                     return;
                   }
                   handleTicketChange(ticket.id, Number(e.target.value));
                 }}
-                disabled={available === 0 || isScaleUpTheme}
+                disabled={available === 0 || $embed.value.form?.solo_ticket}
               >
-                {(isScaleUpTheme ? [0, 1].filter((n) => n <= available) : [...Array(available + 1).keys()]).map(n => (
+                {($embed.value.form?.solo_ticket ? [0, 1].filter((n) => n <= available) : [...Array(available + 1).keys()]).map(n => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </UniversalInput>

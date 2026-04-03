@@ -123,7 +123,7 @@ function EmbeddedCheckoutFlow({ formId, eventId, theme = 'light' }) {
             {$embed.value.currentStep === 'upsell' && !$embed.value.isCountDownTimerDisabled && (
               <div className="text-muted text-center mt-8">Auto-completes in {$upsellTimer.value} seconds</div>
             )}
-            <EmbedOrderTotals theme={theme} />
+            <EmbedOrderTotals />
           </>
         )}
       </Card.Body>

@@ -193,3 +193,63 @@ th, td {
   background: $scale-up-bg !important;
   color: $white !important;
 }
+
+/* Optional: Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+:root {
+  --font-share-tech-mono: 'Share Tech Mono', monospace;
+  --btn-sheer-pink: #ff09a1;
+  --btn-sheer-white: #fff;
+}
+
+.btn-sheer.scale-up {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 52px;
+  min-height: 48px;
+  transform: skewX(-16deg);
+  border-radius: 0 !important;
+  text-decoration: none;
+  overflow: hidden;
+  transition: filter 0.35s ease-in-out, background-color 0.35s ease-in-out,
+    color 0.35s ease-in-out;
+}
+
+.btn-sheer.scale-up .btn-sheer-inner {
+  display: inline-block;
+  transform: skewX(16deg);
+  font-family: var(--font-share-tech-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+}
+
+.btn-sheer.scale-up.outline {
+  border: 1px solid var(--btn-sheer-pink) !important;
+  background: transparent !important;
+  color: var(--btn-sheer-pink) !important;
+}
+
+.btn-sheer.scale-up.outline .btn-sheer-inner {
+  color: var(--btn-sheer-pink);
+}
+
+.btn-sheer.scale-up.outline:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.btn-sheer.scale-up.outline:disabled {
+  opacity: 0.6;
+}
+
+.btn-sheer.scale-up.gradient-register {
+  border: 0 !important;
+  background: linear-gradient(105deg, #2cb9ff 0%, #8a4dff 48%, #ff0aa5 100%) !important;
+  color: var(--btn-sheer-white) !important;
+}
+
+.btn-sheer.scale-up.gradient-register .btn-sheer-inner {
+  color: var(--btn-sheer-white);
+}

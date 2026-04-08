@@ -55,8 +55,6 @@ export const loadForms = async (eventId) => {
 
 export const handleOpenModal = (form = null) => {
   if (form) {
-    // eslint-disable-next-line no-console
-    console.debug('[FormsManager] handleOpenModal form.available_upselling_ids =', form.available_upselling_ids);
     $formManagerForm.update({
       name: form.name,
       description: form.description || '',
@@ -72,6 +70,9 @@ export const handleOpenModal = (form = null) => {
       request_communication_preference: form.request_communication_preference ?? false,
       theme: form.theme || 'light',
       order_confirmation_url: form.order_confirmation_url || '',
+      mandatory_additional_holders: form.mandatory_additional_holders ?? false,
+      show_subtotals: form.show_subtotals ?? true,
+      solo_ticket: form.solo_ticket ?? false,
     });
     $formManagerUI.update({
       showModal: true,
@@ -255,6 +256,9 @@ export const handleSubmit = async (e, eventId, onUpdate) => {
       theme: formData.theme,
       order_confirmation_url: formData.order_confirmation_url || null,
       upsellings_display: formData.upsellings_display || 'LIST',
+      mandatory_additional_holders: formData.mandatory_additional_holders ?? false,
+      show_subtotals: formData.show_subtotals ?? true,
+      solo_ticket: formData.solo_ticket ?? false,
     };
 
     const { editingForm } = $formManagerUI.value;
